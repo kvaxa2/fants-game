@@ -471,80 +471,51 @@ if (currentPage === 'results.html') {
     const fant = item.dataset.fant;
     
     if (gameState.revealed[fant]) {
-      // Если уже раскрыт — показываем просто
       alert(fant);
       return;
     }
 
-    // ✅ Показываем диалог с двумя кнопками
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8); z-index: 10000;
-      display: flex; justify-content: center; align-items: center;
-    `;
+    // ✅ Используем <dialog>
+    const dialog = document.getElementById('fantActionDialog');
+    document.getElementById('dialogFantText').textContent = fant;
     
-    dialog.innerHTML = `
-      <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center;">
-        <h3 style="margin: 0 0 16px;">❓ Фант</h3>
-        <p style="font-size: 1.2rem; margin: 0 0 20px; word-break: break-word;">${fant}</p>
-        <div style="display: flex; gap: 10px;">
-          <button id="revealBtn" style="flex:1; padding:12px; background:#4caf50; border:none; border-radius:8px; color:white; font-weight:bold;">ОК</button>
-          <button id="deleteBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Удалить</button>
-        </div>
-      </div>
-    `;
+    // Кнопки внутри диалога
+    const revealBtn = document.getElementById('dialogRevealBtn');
+    const deleteBtn = document.getElementById('dialogDeleteBtn');
     
-    document.body.appendChild(dialog);
-
-    // Кнопка "ОК"
-    dialog.querySelector('#revealBtn').onclick = () => {
+    // Удаляем старые обработчики (чтобы не накапливались)
+    revealBtn.onclick = null;
+    deleteBtn.onclick = null;
+    
+    revealBtn.onclick = () => {
       gameState.revealed[fant] = true;
       saveState();
       showCategory(tab, min, max);
-      document.body.removeChild(dialog);
+      dialog.close();
     };
-
-    // Кнопка "Удалить"
-    dialog.querySelector('#deleteBtn').onclick = () => {
-      document.body.removeChild(dialog);
-
-      // Подтверждение удаления
-      const confirmDialog = document.createElement('div');
-      confirmDialog.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.8); z-index: 10001;
-        display: flex; justify-content: center; align-items: center;
-      `;
+    
+    deleteBtn.onclick = () => {
+      dialog.close();
       
-      confirmDialog.innerHTML = `
-        <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center;">
-          <h3 style="margin: 0 0 16px; color: #ff9800;">⚠️ Удалить фант?</h3>
-          <p style="margin: 0 0 20px;">«${fant}» будет удалён навсегда.</p>
-          <div style="display: flex; gap: 10px;">
-            <button id="confirmNo" style="flex:1; padding:12px; background:#333; border:none; border-radius:8px; color:white;">Нет</button>
-            <button id="confirmYes" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Да</button>
-          </div>
-        </div>
-      `;
+      // Показываем подтверждение
+      const confirmDialog = document.getElementById('confirmDeleteDialog');
+      document.getElementById('confirmFantText').textContent = `«${fant}» будет удалён навсегда.`;
       
-      document.body.appendChild(confirmDialog);
-
-      confirmDialog.querySelector('#confirmNo').onclick = () => {
-        document.body.removeChild(confirmDialog);
-      };
-
-      confirmDialog.querySelector('#confirmYes').onclick = () => {
-        // ✅ Удаляем фант изо всех структур
+      document.getElementById('confirmNoBtn').onclick = () => confirmDialog.close();
+      document.getElementById('confirmYesBtn').onclick = () => {
+        // ✅ Удаляем фант
         gameState.fants = gameState.fants.filter(f => f !== fant);
         delete gameState.scores[fant];
         delete gameState.revealed[fant];
-        
         saveState();
         showCategory(tab, min, max);
-        document.body.removeChild(confirmDialog);
+        confirmDialog.close();
       };
+      
+      confirmDialog.showModal();
     };
+    
+    dialog.showModal();
   });
 });
     }

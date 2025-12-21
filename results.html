@@ -87,5 +87,24 @@
   </div>
 
   <script src="script.js"></script>
+  <!-- Диалог раскрытия/удаления фанта -->
+<dialog id="fantActionDialog">
+  <h3 id="dialogTitle">❓ Фант</h3>
+  <p id="dialogFantText" style="font-size:1.2rem; margin:16px 0; word-break:break-word;"></p>
+  <div style="display:flex; gap:10px;">
+    <button id="dialogRevealBtn" style="flex:1; padding:12px; background:#4caf50; border:none; border-radius:8px; color:white; font-weight:bold;">ОК</button>
+    <button id="dialogDeleteBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Удалить</button>
+  </div>
+</dialog>
+
+<!-- Диалог подтверждения удаления -->
+<dialog id="confirmDeleteDialog">
+  <h3 style="color:#ff9800;">⚠️ Удалить фант?</h3>
+  <p id="confirmFantText" style="margin:16px 0;"></p>
+  <div style="display:flex; gap:10px;">
+    <button id="confirmNoBtn" style="flex:1; padding:12px; background:#333; border:none; border-radius:8px; color:white;">Нет</button>
+    <button id="confirmYesBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Да</button>
+  </div>
+</dialog>
 </body>
 </html>
