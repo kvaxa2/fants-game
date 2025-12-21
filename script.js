@@ -224,14 +224,21 @@ if (currentPage === 'index.html' || currentPage === '') {
     });
 
     document.getElementById('doneFantsBtn')?.addEventListener('click', () => {
-      if (gameState.fants.length === 0) {
-        alert('❗ Нужно хотя бы 1 фант');
-        return;
-      }
-      saveState();
-      const url = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
-      window.location.href = url;
-    });
+  if (gameState.fants.length === 0) {
+    alert('❗ Нужно хотя бы 1 фант');
+    return;
+  }
+
+  // ✅ ПЕРЕМЕШИВАЕМ ФАНТЫ — как в Android
+  for (let i = gameState.fants.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [gameState.fants[i], gameState.fants[j]] = [gameState.fants[j], gameState.fants[i]];
+  }
+
+  saveState();
+  const url = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
+  window.location.href = url;
+});
 
     const updateSavedList = () => {
       const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
@@ -254,14 +261,61 @@ if (currentPage === 'index.html' || currentPage === '') {
       }
     };
 
-    window.loadGame = (name) => {
+   window.loadGame = (name) => {
+  try {
+    const dataStr = localStorage.getItem(`game_${name}`);
+    if (!dataStr) throw new Error('Not found');
+
+    const data = JSON.parse(dataStr);
+
+    // ✅ Определяем тип: если есть fants_raw → финал, иначе — черновик
+    if (data.fants_raw) {
+      // Финальная игра — переходим к результатам
+      const fantsRaw = data.fants_raw;
+      const fants = [];
+      const scores = {};
+      const revealed = {};
+
+      fantsRaw.split(';').forEach(part => {
+        if (part.includes('=')) {
+          const [fant, rest] = part.split('=', 2);
+          const [scoreStr, revealedStr] = rest.split(':', 2);
+          const score = parseInt(scoreStr) || 0;
+          const isRevealed = revealedStr === '1';
+          fants.push(fant);
+          scores[fant] = score;
+          revealed[fant] = isRevealed;
+        }
+      });
+
+      // Сохраняем в gameState
+      gameState.sessionName = name;
+      gameState.playerNames = data.playerNames || [];
+      gameState.fants = fants;
+      gameState.scores = scores;
+      gameState.revealed = revealed;
+
+      // Переходим к результатам
+      const params = new URLSearchParams();
+      params.set('session', name);
+      params.set('scores', JSON.stringify(scores));
+      params.set('revealed', JSON.stringify(revealed));
+      params.set('fants', JSON.stringify(fants));
+
+      window.location.href = `results.html?${params.toString()}`;
+    } else {
+      // Черновик — открываем ввод фантов
       if (loadState(name)) {
         showScreen('fants');
         updateUI();
       } else {
-        alert('❌ Не удалось загрузить: ' + name);
+        throw new Error('Load failed');
       }
-    };
+    }
+  } catch (e) {
+    alert('❌ Не удалось загрузить: ' + name);
+  }
+};
 
     updateUI();
   });
@@ -413,16 +467,86 @@ if (currentPage === 'results.html') {
       ).join('');
 
       list.querySelectorAll('.fant-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const fant = item.dataset.fant;
-          if (!gameState.revealed[fant]) {
-            alert(fant);
-            gameState.revealed[fant] = true;
-            saveState();
-            showCategory(tab, min, max);
-          }
-        });
-      });
+  item.addEventListener('click', () => {
+    const fant = item.dataset.fant;
+    
+    if (gameState.revealed[fant]) {
+      // Если уже раскрыт — показываем просто
+      alert(fant);
+      return;
+    }
+
+    // ✅ Показываем диалог с двумя кнопками
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); z-index: 10000;
+      display: flex; justify-content: center; align-items: center;
+    `;
+    
+    dialog.innerHTML = `
+      <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center;">
+        <h3 style="margin: 0 0 16px;">❓ Фант</h3>
+        <p style="font-size: 1.2rem; margin: 0 0 20px; word-break: break-word;">${fant}</p>
+        <div style="display: flex; gap: 10px;">
+          <button id="revealBtn" style="flex:1; padding:12px; background:#4caf50; border:none; border-radius:8px; color:white; font-weight:bold;">ОК</button>
+          <button id="deleteBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Удалить</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+
+    // Кнопка "ОК"
+    dialog.querySelector('#revealBtn').onclick = () => {
+      gameState.revealed[fant] = true;
+      saveState();
+      showCategory(tab, min, max);
+      document.body.removeChild(dialog);
+    };
+
+    // Кнопка "Удалить"
+    dialog.querySelector('#deleteBtn').onclick = () => {
+      document.body.removeChild(dialog);
+
+      // Подтверждение удаления
+      const confirmDialog = document.createElement('div');
+      confirmDialog.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8); z-index: 10001;
+        display: flex; justify-content: center; align-items: center;
+      `;
+      
+      confirmDialog.innerHTML = `
+        <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center;">
+          <h3 style="margin: 0 0 16px; color: #ff9800;">⚠️ Удалить фант?</h3>
+          <p style="margin: 0 0 20px;">«${fant}» будет удалён навсегда.</p>
+          <div style="display: flex; gap: 10px;">
+            <button id="confirmNo" style="flex:1; padding:12px; background:#333; border:none; border-radius:8px; color:white;">Нет</button>
+            <button id="confirmYes" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Да</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(confirmDialog);
+
+      confirmDialog.querySelector('#confirmNo').onclick = () => {
+        document.body.removeChild(confirmDialog);
+      };
+
+      confirmDialog.querySelector('#confirmYes').onclick = () => {
+        // ✅ Удаляем фант изо всех структур
+        gameState.fants = gameState.fants.filter(f => f !== fant);
+        delete gameState.scores[fant];
+        delete gameState.revealed[fant];
+        
+        saveState();
+        showCategory(tab, min, max);
+        document.body.removeChild(confirmDialog);
+      };
+    };
+  });
+});
     }
 
     document.querySelector('[data-tab="easy"]')?.addEventListener('click', () => showCategory('easy', 1, 6));
