@@ -6,7 +6,7 @@ import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebase
 
 // 🔑 Вставьте СВОЮ конфигурацию
 const firebaseConfig = {
-  apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
+   apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
   authDomain: "fants-game.firebaseapp.com",
   projectId: "fants-game",
   storageBucket: "fants-game.firebasestorage.app",
@@ -14,7 +14,6 @@ const firebaseConfig = {
   appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
   measurementId: "G-TKHG5KNRZP"
 };
-
 
 // ✅ УКАЖИТЕ databaseURL ЯВНО
 const app = initializeApp(firebaseConfig, {
