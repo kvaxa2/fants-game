@@ -65,7 +65,6 @@
     <h1>🔐 Доступ закрыт</h1>
     <input type="text" id="codeInput" placeholder="Введите код" autocomplete="off" />
     <button id="unlockBtn" disabled>Разблокировать</button>
-    <p style="margin-top: 24px; color: #aaa; text-align: center;">Подсказка: день, когда вы обычно собираетесь 🍕</p>
   </div>
 
   <!-- Главное меню -->
@@ -97,11 +96,24 @@
   <textarea id="fantInput" placeholder="Введите свой фант..." rows="2"></textarea>
   <button id="addFantBtn">Добавить</button>
 
-  <div class="hints">
-    <button class="hint-btn secondary" data-cat="easy">Лёгкие</button>
-    <button class="hint-btn secondary" data-cat="hot">Жаркие</button>
-    <button class="hint-btn secondary" data-cat="fire">Огонь</button>
+  <!-- Подсказки — теперь с диалогами -->
+<div class="hints">
+  <button class="hint-btn secondary" data-cat="easy">Лёгкие</button>
+  <button class="hint-btn secondary" data-cat="hot">Жаркие</button>
+  <button class="hint-btn secondary" data-cat="fire">Огонь</button>
+</div>
+
+<!-- Диалог выбора фанта -->
+<div id="fantDialog" class="screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+  <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%;">
+    <h2 id="dialogTitle">Выберите фант</h2>
+    <div id="dialogList" style="max-height: 300px; overflow-y: auto; margin: 16px 0;"></div>
+    <div style="display: flex; gap: 8px; justify-content: space-between;">
+      <button id="dialogCancel" class="secondary">Отмена</button>
+      <button id="dialogAdd">Добавить</button>
+    </div>
   </div>
+</div>
 
   <div class="fant-list" id="fantList"></div>
 
