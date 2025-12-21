@@ -16,7 +16,9 @@ const firebaseConfig = {
 
 
 // Инициализация
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig, {
+  databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app"
+});
 const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
