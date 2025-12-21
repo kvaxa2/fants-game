@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>🛠 Управление играми</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #6750A4; color: white; }
+    .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+    .delete { background: #f44336; color: white; }
+    .download { background: #4caf50; color: white; }
+    .login { margin: 50px auto; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>🛠 Управление сохранёнными играми</h1>
+  
+  <div id="loginScreen" class="login">
+    <h2>🔐 Войдите через Google</h2>
+    <button id="loginBtn" class="btn" style="background:#4285f4;color:white;">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" style="vertical-align:middle;margin-right:8px;">
+      Войти
+    </button>
+  </div>
+
+  <div id="adminScreen" style="display:none;">
+    <p>Привет, <span id="userName">—</span>! Всего игр: <span id="gameCount">0</span></p>
+    
+    <table id="gamesTable">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Игроки</th>
+          <th>Фантов</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody id="gamesList">
+        <!-- Сюда подгрузятся игры -->
+      </tbody>
+    </table>
+
+    <button id="downloadAllBtn" class="btn download" style="margin-top:20px;">📥 Скачать все игры (JSON)</button>
+  </div>
+
+  <script type="module" src="firebase.js"></script>
+  <script type="module">
+    import { auth, db, provider, signInWithPopup, onAuthStateChanged, ref, onValue, remove } from './firebase.js';
+
+    const loginScreen = document.getElementById('loginScreen');
+    const adminScreen = document.getElementById('adminScreen');
+    const userNameEl = document.getElementById('userName');
+    const gameCountEl = document.getElementById('gameCount');
+    const gamesList = document.getElementById('gamesList');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+    let currentUser = null;
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      if (user) {
+        loginScreen.style.display = 'none';
+        adminScreen.style.display = 'block';
+        userNameEl.textContent = user.displayName || user.email;
+        loadGames();
+      } else {
+        loginScreen.style.display = 'block';
+        adminScreen.style.display = 'none';
+      }
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      signInWithPopup(auth, provider);
+    });
+
+    function loadGames() {
+      if (!currentUser) return;
+      
+      const gamesRef = ref(db, 'users/' + currentUser.uid + '/games');
+      onValue(gamesRef, (snapshot) => {
+        gamesList.innerHTML = '';
+        const games = snapshot.val() || {};
+        const gameNames = Object.keys(games);
+        gameCountEl.textContent = gameNames.length;
+
+        gameNames.forEach(name => {
+          const game = games[name];
+          const row = document.createElement('tr');
+          
+          row.innerHTML = `
+            <td><strong>${name}</strong></td>
+            <td>${game.playerNames?.join(', ') || '—'}</td>
+            <td>${game.fants?.length || 0}</td>
+            <td>
+              <button class="btn delete" onclick="deleteGame('${name}')">🗑️ Удалить</button>
+            </td>
+          `;
+          gamesList.appendChild(row);
+        });
+      });
+    }
+
+    // Глобальная функция для удаления
+    window.deleteGame = (name) => {
+      if (!confirm(`Удалить игру «${name}» навсегда?`)) return;
+      
+      const gameRef = ref(db, 'users/' + currentUser.uid + '/games/' + name);
+      remove(gameRef)
+        .then(() => alert('✅ Удалено'))
+        .catch(err => alert('❌ Ошибка: ' + err.message));
+    };
+
+    downloadAllBtn.addEventListener('click', () => {
+      const gamesRef = ref(db, 'users/' + currentUser.uid + '/games');
+      onValue(gamesRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `fants_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, { onlyOnce: true });
+    });
+  </script>
+</body>
+</html>
