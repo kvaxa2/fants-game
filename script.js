@@ -34,26 +34,12 @@ if (typeof importScripts !== 'function') {
 
       // Следим за авторизацией
       onAuthStateChanged(auth, (user) => {
-  currentUser = user;
-  if (user) {
-    dbRef = ref(db, 'users/' + user.uid + '/games');
-    
-    // ✅ МИГРАЦИЯ: переносим старые игры в облако
-    const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
-    names.forEach(name => {
-      const data = localStorage.getItem(`game_${name}`);
-      if (data) {
-        try {
-          const saved = JSON.parse(data);
-          // Сохраняем в Firebase
-          dbRef.child(name).set(saved);
-        } catch (e) {
-          console.warn("Миграция: ошибка", name, e);
+        currentUser = user;
+        if (user) {
+          dbRef = ref(db, 'users/' + user.uid + '/games');
         }
-      }
-    });
-  }
-});
+      });
+
       // Кнопка входа
       document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
         signInWithPopup(auth, provider)
@@ -330,20 +316,7 @@ if (currentPage === 'index.html' || currentPage === '') {
 
     window.loadGame = (name) => {
       try {
-        // ✅ Сначала пробуем из облака
-if (currentUser && dbRef) {
-  try {
-    const snapshot = await get(dbRef.child(name));
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      // ... обработка как раньше
-      return;
-    }
-  } catch (e) {}
-}
-
-// ❌ Только если нет в облаке — из localStorage
-const dataStr = localStorage.getItem(`game_${name}`);
+        const dataStr = localStorage.getItem(`game_${name}`);
         if (!dataStr) throw new Error('Not found');
 
         const data = JSON.parse(dataStr);
