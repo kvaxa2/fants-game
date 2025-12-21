@@ -1,53 +1,9 @@
-// ✅ Единый script.js — блокировка, ввод, голосование, результаты
+// ✅ Единый script.js — блокировка, ввод, голосование, результаты + Firebase
 // Работает с: index.html, voting.html, results.html
 
 const currentPage = window.location.pathname.split('/').pop();
-// Firebase
-let currentUser = null;
-let dbRef = null;
 
-// Динамический импорт (чтобы не ломать старую версию)
-if (typeof importScripts !== 'function') {
-  import('./firebase.js')
-    .then(firebase => {
-      const { auth, db, provider, signInWithPopup, onAuthStateChanged, ref, set, onValue } = firebase;
-
-      // Следим за авторизацией
-      onAuthStateChanged(auth, (user) => {
-        currentUser = user;
-        if (user) {
-          dbRef = ref(db, 'users/' + user.uid + '/games');
-          
-          // 🔁 Автосинхронизация
-          onValue(dbRef, (snapshot) => {
-            if (snapshot.exists()) {
-              const data = snapshot.val();
-              // Восстанавливаем сохранённые игры
-              localStorage.setItem('saved_games_cloud', JSON.stringify(data));
-              
-              // Если текущая сессия есть — загружаем
-              if (gameState.sessionName && data[gameState.sessionName]) {
-                Object.assign(gameState, data[gameState.sessionName]);
-              }
-            }
-          });
-        }
-      });
-
-      // Кнопка входа
-      document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
-        signInWithPopup(auth, provider)
-          .catch(error => {
-            console.error("Ошибка входа:", error);
-            alert('❌ Не удалось войти через Google');
-          });
-      });
-    })
-    .catch(err => {
-      console.warn("Firebase не подключён:", err);
-    });
-}
-
+// ✅ 1. gameState — объявлен ПЕРВЫМ
 let gameState = {
   code: '',
   sessionName: '',
@@ -65,6 +21,40 @@ let gameState = {
   availableHot: [],
   availableFire: []
 };
+
+// ✅ 2. Firebase — после gameState
+let currentUser = null;
+let dbRef = null;
+
+// Динамический импорт Firebase
+if (typeof importScripts !== 'function') {
+  import('./firebase.js')
+    .then(firebase => {
+      const { auth, db, provider, signInWithPopup, onAuthStateChanged, ref, set } = firebase;
+
+      // Следим за авторизацией
+      onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (user) {
+          dbRef = ref(db, 'users/' + user.uid + '/games');
+        }
+      });
+
+      // Кнопка входа
+      document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
+        signInWithPopup(auth, provider)
+          .catch(error => {
+            console.error("Ошибка входа:", error);
+            alert('❌ Не удалось войти через Google');
+          });
+      });
+    })
+    .catch(err => {
+      console.warn("Firebase не подключён:", err);
+    });
+}
+
+// ✅ 3. Функции — как раньше, но с облаком в saveState
 
 async function loadFantLists() {
   try {
@@ -86,6 +76,7 @@ async function loadFantLists() {
 }
 
 function saveState() {
+  // Локальное сохранение (как раньше)
   if (gameState.sessionName) {
     try {
       const data = {
@@ -107,13 +98,12 @@ function saveState() {
       }
     } catch (e) {}
   }
-  // После локального сохранения → в облако
-if (currentUser && dbRef && gameState.sessionName) {
-  import('./firebase.js')
-    .then(firebase => {
-      const { set } = firebase;
-      const gameRef = firebase.ref(db, 'users/' + currentUser.uid + '/games/' + gameState.sessionName);
-      set(gameRef, {
+
+  // ✅ Облачное сохранение — используем уже загруженные функции
+  if (currentUser && dbRef && gameState.sessionName) {
+    try {
+      const gameRef = dbRef.child(gameState.sessionName);
+      gameRef.set({
         sessionName: gameState.sessionName,
         playerNames: gameState.playerNames,
         fants: gameState.fants,
@@ -121,8 +111,10 @@ if (currentUser && dbRef && gameState.sessionName) {
         revealed: gameState.revealed,
         votes: gameState.votes
       });
-    });
-}
+    } catch (e) {
+      console.warn("Облако: не удалось сохранить", e);
+    }
+  }
 }
 
 function loadState(sessionName) {
@@ -285,21 +277,21 @@ if (currentPage === 'index.html' || currentPage === '') {
     });
 
     document.getElementById('doneFantsBtn')?.addEventListener('click', () => {
-  if (gameState.fants.length === 0) {
-    alert('❗ Нужно хотя бы 1 фант');
-    return;
-  }
+      if (gameState.fants.length === 0) {
+        alert('❗ Нужно хотя бы 1 фант');
+        return;
+      }
 
-  // ✅ ПЕРЕМЕШИВАЕМ ФАНТЫ — как в Android
-  for (let i = gameState.fants.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [gameState.fants[i], gameState.fants[j]] = [gameState.fants[j], gameState.fants[i]];
-  }
+      // ✅ ПЕРЕМЕШИВАЕМ ФАНТЫ — как в Android
+      for (let i = gameState.fants.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [gameState.fants[i], gameState.fants[j]] = [gameState.fants[j], gameState.fants[i]];
+      }
 
-  saveState();
-  const url = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
-  window.location.href = url;
-});
+      saveState();
+      const url = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
+      window.location.href = url;
+    });
 
     const updateSavedList = () => {
       const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
@@ -322,61 +314,56 @@ if (currentPage === 'index.html' || currentPage === '') {
       }
     };
 
-   window.loadGame = (name) => {
-  try {
-    const dataStr = localStorage.getItem(`game_${name}`);
-    if (!dataStr) throw new Error('Not found');
+    window.loadGame = (name) => {
+      try {
+        const dataStr = localStorage.getItem(`game_${name}`);
+        if (!dataStr) throw new Error('Not found');
 
-    const data = JSON.parse(dataStr);
+        const data = JSON.parse(dataStr);
 
-    // ✅ Определяем тип: если есть fants_raw → финал, иначе — черновик
-    if (data.fants_raw) {
-      // Финальная игра — переходим к результатам
-      const fantsRaw = data.fants_raw;
-      const fants = [];
-      const scores = {};
-      const revealed = {};
+        if (data.fants_raw) {
+          const fantsRaw = data.fants_raw;
+          const fants = [];
+          const scores = {};
+          const revealed = {};
 
-      fantsRaw.split(';').forEach(part => {
-        if (part.includes('=')) {
-          const [fant, rest] = part.split('=', 2);
-          const [scoreStr, revealedStr] = rest.split(':', 2);
-          const score = parseInt(scoreStr) || 0;
-          const isRevealed = revealedStr === '1';
-          fants.push(fant);
-          scores[fant] = score;
-          revealed[fant] = isRevealed;
+          fantsRaw.split(';').forEach(part => {
+            if (part.includes('=')) {
+              const [fant, rest] = part.split('=', 2);
+              const [scoreStr, revealedStr] = rest.split(':', 2);
+              const score = parseInt(scoreStr) || 0;
+              const isRevealed = revealedStr === '1';
+              fants.push(fant);
+              scores[fant] = score;
+              revealed[fant] = isRevealed;
+            }
+          });
+
+          gameState.sessionName = name;
+          gameState.playerNames = data.playerNames || [];
+          gameState.fants = fants;
+          gameState.scores = scores;
+          gameState.revealed = revealed;
+
+          const params = new URLSearchParams();
+          params.set('session', name);
+          params.set('scores', JSON.stringify(scores));
+          params.set('revealed', JSON.stringify(revealed));
+          params.set('fants', JSON.stringify(fants));
+
+          window.location.href = `results.html?${params.toString()}`;
+        } else {
+          if (loadState(name)) {
+            showScreen('fants');
+            updateUI();
+          } else {
+            throw new Error('Load failed');
+          }
         }
-      });
-
-      // Сохраняем в gameState
-      gameState.sessionName = name;
-      gameState.playerNames = data.playerNames || [];
-      gameState.fants = fants;
-      gameState.scores = scores;
-      gameState.revealed = revealed;
-
-      // Переходим к результатам
-      const params = new URLSearchParams();
-      params.set('session', name);
-      params.set('scores', JSON.stringify(scores));
-      params.set('revealed', JSON.stringify(revealed));
-      params.set('fants', JSON.stringify(fants));
-
-      window.location.href = `results.html?${params.toString()}`;
-    } else {
-      // Черновик — открываем ввод фантов
-      if (loadState(name)) {
-        showScreen('fants');
-        updateUI();
-      } else {
-        throw new Error('Load failed');
+      } catch (e) {
+        alert('❌ Не удалось загрузить: ' + name);
       }
-    }
-  } catch (e) {
-    alert('❌ Не удалось загрузить: ' + name);
-  }
-};
+    };
 
     updateUI();
   });
@@ -528,57 +515,52 @@ if (currentPage === 'results.html') {
       ).join('');
 
       list.querySelectorAll('.fant-item').forEach(item => {
-  item.addEventListener('click', () => {
-    const fant = item.dataset.fant;
-    
-    if (gameState.revealed[fant]) {
-      alert(fant);
-      return;
-    }
+        item.addEventListener('click', () => {
+          const fant = item.dataset.fant;
+          
+          if (gameState.revealed[fant]) {
+            alert(fant);
+            return;
+          }
 
-    // ✅ Используем <dialog>
-    const dialog = document.getElementById('fantActionDialog');
-    document.getElementById('dialogFantText').textContent = fant;
-    
-    // Кнопки внутри диалога
-    const revealBtn = document.getElementById('dialogRevealBtn');
-    const deleteBtn = document.getElementById('dialogDeleteBtn');
-    
-    // Удаляем старые обработчики (чтобы не накапливались)
-    revealBtn.onclick = null;
-    deleteBtn.onclick = null;
-    
-    revealBtn.onclick = () => {
-      gameState.revealed[fant] = true;
-      saveState();
-      showCategory(tab, min, max);
-      dialog.close();
-    };
-    
-    deleteBtn.onclick = () => {
-      dialog.close();
-      
-      // Показываем подтверждение
-      const confirmDialog = document.getElementById('confirmDeleteDialog');
-      document.getElementById('confirmFantText').textContent = `«${fant}» будет удалён навсегда.`;
-      
-      document.getElementById('confirmNoBtn').onclick = () => confirmDialog.close();
-      document.getElementById('confirmYesBtn').onclick = () => {
-        // ✅ Удаляем фант
-        gameState.fants = gameState.fants.filter(f => f !== fant);
-        delete gameState.scores[fant];
-        delete gameState.revealed[fant];
-        saveState();
-        showCategory(tab, min, max);
-        confirmDialog.close();
-      };
-      
-      confirmDialog.showModal();
-    };
-    
-    dialog.showModal();
-  });
-});
+          const dialog = document.getElementById('fantActionDialog');
+          document.getElementById('dialogFantText').textContent = fant;
+          
+          const revealBtn = document.getElementById('dialogRevealBtn');
+          const deleteBtn = document.getElementById('dialogDeleteBtn');
+          
+          revealBtn.onclick = null;
+          deleteBtn.onclick = null;
+          
+          revealBtn.onclick = () => {
+            gameState.revealed[fant] = true;
+            saveState();
+            showCategory(tab, min, max);
+            dialog.close();
+          };
+          
+          deleteBtn.onclick = () => {
+            dialog.close();
+            
+            const confirmDialog = document.getElementById('confirmDeleteDialog');
+            document.getElementById('confirmFantText').textContent = `«${fant}» будет удалён навсегда.`;
+            
+            document.getElementById('confirmNoBtn').onclick = () => confirmDialog.close();
+            document.getElementById('confirmYesBtn').onclick = () => {
+              gameState.fants = gameState.fants.filter(f => f !== fant);
+              delete gameState.scores[fant];
+              delete gameState.revealed[fant];
+              saveState();
+              showCategory(tab, min, max);
+              confirmDialog.close();
+            };
+            
+            confirmDialog.showModal();
+          };
+          
+          dialog.showModal();
+        });
+      });
     }
 
     document.querySelector('[data-tab="easy"]')?.addEventListener('click', () => showCategory('easy', 1, 6));
