@@ -1,293 +1,461 @@
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("🚀 Игра загружена");
+// ✅ Единый script.js — блокировка, ввод, голосование, результаты
+// Работает с: index.html, voting.html, results.html
 
-  let state = {
-    code: '',
-    playerNames: [],
-    sessionName: '',
-    fants: [],
-    currentPlayerIndex: 0,
-    availableEasy: [],
-    availableHot: [],
-    availableFire: [],
-    easyFants: [],
-    hotFants: [],
-    fireFants: []
-  };
+const currentPage = window.location.pathname.split('/').pop();
 
-  // ✅ Загрузка фантов из fants.json
-  const loadFantLists = async () => {
+let gameState = {
+  code: '',
+  sessionName: '',
+  playerNames: [],
+  fants: [],
+  votes: {},
+  currentPlayer: 0,
+  currentFantIndex: 0,
+  scores: {},
+  revealed: {},
+  easyFants: [],
+  hotFants: [],
+  fireFants: [],
+  availableEasy: [],
+  availableHot: [],
+  availableFire: []
+};
+
+async function loadFantLists() {
+  try {
+    const response = await fetch('fants.json?_=' + Date.now());
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    gameState.easyFants = data.easy || [];
+    gameState.hotFants = data.hot || [];
+    gameState.fireFants = data.fire || [];
+  } catch (e) {
+    console.warn("⚠️ Используем встроенные фанты");
+    gameState.easyFants = ["подпрыгни", "ляж на спину", "спой куплет"];
+    gameState.hotFants = ["отжимайся", "беги", "поцелуй в щёчку"];
+    gameState.fireFants = ["отожмись 10 раз", "танец под музыку", "лечь отдохнуть на коленях"];
+  }
+  gameState.availableEasy = [...gameState.easyFants];
+  gameState.availableHot = [...gameState.hotFants];
+  gameState.availableFire = [...gameState.fireFants];
+}
+
+function saveState() {
+  if (gameState.sessionName) {
     try {
-      const response = await fetch('fants.json?_=' + Date.now()); // обход кэша
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      state.easyFants = data.easy || [];
-      state.hotFants = data.hot || [];
-      state.fireFants = data.fire || [];
-
-      state.availableEasy = [...state.easyFants];
-      state.availableHot = [...state.hotFants];
-      state.availableFire = [...state.fireFants];
-
-      console.log("✅ Фанты загружены из fants.json");
-      console.log("Easy:", state.easyFants.length, "Hot:", state.hotFants.length, "Fire:", state.fireFants.length);
-    } catch (e) {
-      console.warn("⚠️ fants.json не загружен — используем встроенные фанты");
-      // Встроенные фанты (резерв)
-      state.easyFants = ["подпрыгни", "ляж на спину", "спой куплет", "сделай комплимент"];
-      state.hotFants = ["отжимайся", "беги 10 секунд", "поцелуй в щёчку", "объятия 10 сек"];
-      state.fireFants = ["отожмись 10 раз", "танец под музыку", "лечь отдохнуть на коленях", "съешь ложку сахара"];
-      state.availableEasy = [...state.easyFants];
-      state.availableHot = [...state.hotFants];
-      state.availableFire = [...state.fireFants];
-    }
-  };
-
-  const saveState = () => {
-    if (state.sessionName) {
-      try {
-        localStorage.setItem(`game_${state.sessionName}`, JSON.stringify({
-          playerNames: state.playerNames,
-          fants: state.fants,
-          currentPlayerIndex: state.currentPlayerIndex,
-          availableEasy: state.availableEasy,
-          availableHot: state.availableHot,
-          availableFire: state.availableFire
-        }));
-        const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
-        if (!names.includes(state.sessionName)) {
-          names.push(state.sessionName);
-          localStorage.setItem('saved_games', JSON.stringify(names));
-        }
-      } catch (e) {}
-    }
-  };
-
-  const loadState = (sessionName) => {
-    try {
-      const data = localStorage.getItem(`game_${sessionName}`);
-      if (data) {
-        const saved = JSON.parse(data);
-        state.playerNames = saved.playerNames || [];
-        state.fants = saved.fants || [];
-        state.currentPlayerIndex = saved.currentPlayerIndex || 0;
-        state.availableEasy = saved.availableEasy || state.easyFants;
-        state.availableHot = saved.availableHot || state.hotFants;
-        state.availableFire = saved.availableFire || state.fireFants;
-        state.sessionName = sessionName;
-        return true;
+      const data = {
+        sessionName: gameState.sessionName,
+        playerNames: gameState.playerNames,
+        fants: gameState.fants,
+        availableEasy: gameState.availableEasy,
+        availableHot: gameState.availableHot,
+        availableFire: gameState.availableFire,
+        votes: gameState.votes,
+        scores: gameState.scores,
+        revealed: gameState.revealed
+      };
+      localStorage.setItem(`game_${gameState.sessionName}`, JSON.stringify(data));
+      const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
+      if (!names.includes(gameState.sessionName)) {
+        names.push(gameState.sessionName);
+        localStorage.setItem('saved_games', JSON.stringify(names));
       }
     } catch (e) {}
-    return false;
-  };
+  }
+}
 
-  const showScreen = (screenId) => {
-    document.querySelectorAll('.screen').forEach(el => {
-      el.classList.remove('active');
-      el.style.display = 'none';
-    });
-    const screen = document.getElementById(screenId);
-    if (screen) {
-      screen.style.display = 'block';
-      setTimeout(() => screen.classList.add('active'), 10);
+function loadState(sessionName) {
+  try {
+    const data = localStorage.getItem(`game_${sessionName}`);
+    if (data) {
+      const saved = JSON.parse(data);
+      Object.assign(gameState, saved);
+      return true;
     }
-  };
+  } catch (e) {}
+  return false;
+}
 
-  // 🔐 Блокировка
-  const codeInput = document.getElementById('codeInput');
-  const unlockBtn = document.getElementById('unlockBtn');
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(el => {
+    el.classList.remove('active');
+    el.style.display = 'none';
+  });
+  const screen = document.getElementById(screenId);
+  if (screen) {
+    screen.style.display = 'block';
+    setTimeout(() => screen.classList.add('active'), 10);
+  }
+}
 
-  if (codeInput && unlockBtn) {
-    codeInput.addEventListener('input', () => {
-      state.code = codeInput.value.trim().toLowerCase();
-      unlockBtn.disabled = state.code !== 'суббота';
+// 🔐 БЛОКИРОВКА
+if (currentPage === 'index.html' || currentPage === '') {
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadFantLists();
+
+    const codeInput = document.getElementById('codeInput');
+    const unlockBtn = document.getElementById('unlockBtn');
+
+    if (codeInput && unlockBtn) {
+      codeInput.addEventListener('input', () => {
+        const code = codeInput.value.trim().toLowerCase();
+        unlockBtn.disabled = code !== 'суббота';
+      });
+
+      unlockBtn.addEventListener('click', () => {
+        const code = codeInput.value.trim().toLowerCase();
+        if (code === 'суббота') {
+          showScreen('main');
+          updateSavedList();
+        } else {
+          alert('❌ Неверный код');
+        }
+      });
+    }
+
+    document.getElementById('newGameBtn')?.addEventListener('click', () => {
+      showScreen('names');
     });
 
-    unlockBtn.addEventListener('click', () => {
-      if (state.code === 'суббота') {
-        showScreen('main');
-        updateSavedList();
+    document.getElementById('nextNamesBtn')?.addEventListener('click', () => {
+      const names = [
+        document.getElementById('boy1')?.value.trim(),
+        document.getElementById('girl1')?.value.trim(),
+        document.getElementById('boy2')?.value.trim(),
+        document.getElementById('girl2')?.value.trim()
+      ].filter(x => x);
+      const session = document.getElementById('sessionName')?.value.trim();
+
+      if (names.length < 4) {
+        alert('❗ Заполните все имена');
+        return;
+      }
+      if (!session) {
+        alert('❗ Введите название игры');
+        return;
+      }
+
+      gameState.playerNames = names;
+      gameState.sessionName = session;
+      gameState.fants = [];
+
+      gameState.availableEasy = [...gameState.easyFants];
+      gameState.availableHot = [...gameState.hotFants];
+      gameState.availableFire = [...gameState.fireFants];
+
+      saveState();
+      showScreen('fants');
+      updateUI();
+    });
+
+    const updateUI = () => {
+      document.getElementById('currentPlayer').textContent = 
+        gameState.playerNames[0] || '—';
+      document.getElementById('counter').textContent = gameState.fants.length;
+      const list = document.getElementById('fantList');
+      if (list) list.innerHTML = '';
+    };
+
+    document.getElementById('backToNamesBtn')?.addEventListener('click', () => {
+      saveState();
+      showScreen('main');
+    });
+
+    document.getElementById('addFantBtn')?.addEventListener('click', () => {
+      const text = document.getElementById('fantInput')?.value.trim();
+      if (text) {
+        gameState.fants.push(text);
+        document.getElementById('fantInput').value = '';
+        saveState();
+        updateUI();
       }
     });
-  }
 
-  // 🏠 Главное меню
-  document.getElementById('newGameBtn')?.addEventListener('click', () => {
-    showScreen('names');
-  });
+    const showFantDialog = (category) => {
+      const dialog = document.getElementById('fantDialog');
+      const list = document.getElementById('dialogList');
 
-  document.getElementById('backToMain')?.addEventListener('click', () => {
-    showScreen('main');
-    updateSavedList();
-  });
+      let availableList = [];
+      switch (category) {
+        case 'easy': availableList = [...gameState.availableEasy]; break;
+        case 'hot': availableList = [...gameState.availableHot]; break;
+        case 'fire': availableList = [...gameState.availableFire]; break;
+        default: return;
+      }
 
-  // 👥 Ввод имён
-  document.getElementById('nextNamesBtn')?.addEventListener('click', () => {
-    const names = [
-      document.getElementById('boy1')?.value.trim(),
-      document.getElementById('girl1')?.value.trim(),
-      document.getElementById('boy2')?.value.trim(),
-      document.getElementById('girl2')?.value.trim()
-    ].filter(x => x);
-    const session = document.getElementById('sessionName')?.value.trim();
+      for (let i = availableList.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availableList[i], availableList[j]] = [availableList[j], availableList[i]];
+      }
 
-    if (names.length < 4) {
-      alert('❗ Заполните все имена');
-      return;
-    }
-    if (!session) {
-      alert('❗ Введите название игры');
-      return;
-    }
+      list.innerHTML = availableList.map(fant => 
+        `<div class="fant-item" data-fant="${fant}" style="cursor:pointer;padding:12px;background:#2d2d2d;margin:6px 0;border-radius:8px;">${fant}</div>`
+      ).join('');
 
-    state.playerNames = names;
-    state.sessionName = session;
-    state.currentPlayerIndex = 0;
-    state.fants = [];
+      list.querySelectorAll('.fant-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const selected = item.dataset.fant;
+          gameState.fants.push(selected);
 
-    state.availableEasy = [...state.easyFants];
-    state.availableHot = [...state.hotFants];
-    state.availableFire = [...state.fireFants];
+          switch (category) {
+            case 'easy': gameState.availableEasy = gameState.availableEasy.filter(f => f !== selected); break;
+            case 'hot': gameState.availableHot = gameState.availableHot.filter(f => f !== selected); break;
+            case 'fire': gameState.availableFire = gameState.availableFire.filter(f => f !== selected); break;
+          }
 
-    saveState();
-    showScreen('fants');
-    updateUI();
-  });
+          saveState();
+          updateUI();
+          showFantDialog(category);
+        });
+      });
 
-  // 🖊️ Ввод фантов
-  const updateUI = () => {
-    if (state.playerNames.length > 0) {
-      document.getElementById('currentPlayer').textContent = 
-        state.playerNames[state.currentPlayerIndex] || '—';
-      document.getElementById('counter').textContent = state.fants.length;
-      
-      // ✅ 4. Добавленные фанты НЕ отображаются — только счётчик
-      const list = document.getElementById('fantList');
-      if (list) list.innerHTML = ''; // Пустой список
-    }
-  };
+      document.getElementById('dialogCancel')?.addEventListener('click', () => {
+        dialog.style.display = 'none';
+      });
 
-  // ✅ 1. КНОПКА НАЗАД → в главное меню (а не к именам)
-  document.getElementById('backToNamesBtn')?.addEventListener('click', () => {
-    saveState();
-    showScreen('main'); // ← главный экран
-    updateSavedList();
-  });
+      dialog.style.display = 'flex';
+    };
 
-  document.getElementById('addFantBtn')?.addEventListener('click', () => {
-    const text = document.getElementById('fantInput')?.value.trim();
-    if (text) {
-      state.fants.push(text);
-      document.getElementById('fantInput').value = '';
-      saveState();
-      updateUI();
-    }
-  });
-
-  // ✅ Диалог выбора фанта — НЕ закрывается после выбора
-  const showFantDialog = (category) => {
-    const dialog = document.getElementById('fantDialog');
-    const title = document.getElementById('dialogTitle');
-    const list = document.getElementById('dialogList');
-
-    title.textContent = `Выберите фант (${category})`;
-
-    let availableList = [];
-    switch (category) {
-      case 'easy': availableList = [...state.availableEasy]; break;
-      case 'hot': availableList = [...state.availableHot]; break;
-      case 'fire': availableList = [...state.availableFire]; break;
-      default: return;
-    }
-
-    // Перемешиваем
-    for (let i = availableList.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [availableList[i], availableList[j]] = [availableList[j], availableList[i]];
-    }
-
-    list.innerHTML = availableList.map(fant => 
-      `<div class="fant-item" data-fant="${fant}" style="cursor:pointer;padding:12px;background:#2d2d2d;margin:6px 0;border-radius:8px;">${fant}</div>`
-    ).join('');
-
-    // ✅ 3. Клик — добавляет фант, но НЕ закрывает диалог
-    list.querySelectorAll('.fant-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const selected = item.dataset.fant;
-        state.fants.push(selected);
-
-        // Удаляем из доступных
-        switch (category) {
-          case 'easy': state.availableEasy = state.availableEasy.filter(f => f !== selected); break;
-          case 'hot': state.availableHot = state.availableHot.filter(f => f !== selected); break;
-          case 'fire': state.availableFire = state.availableFire.filter(f => f !== selected); break;
-        }
-
-        saveState();
-        updateUI(); // Обновляем счётчик
-
-        // Обновляем список в диалоге (без закрытия)
-        showFantDialog(category); // рекурсивно обновляем
+    document.querySelectorAll('.hint-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.dataset.cat;
+        showFantDialog(cat);
       });
     });
 
-    document.getElementById('dialogCancel')?.addEventListener('click', () => {
-      dialog.style.display = 'none';
-    });
-
-    dialog.style.display = 'flex';
-  };
-
-  document.querySelectorAll('.hint-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cat = btn.dataset.cat;
-      showFantDialog(cat);
-    });
-  });
-
-  document.getElementById('doneFantsBtn')?.addEventListener('click', () => {
-    if (state.fants.length === 0) {
-      alert('❗ Нужно хотя бы 1 фант');
-      return;
-    }
-    showScreen('voting');
-  });
-
-  const updateSavedList = () => {
-    const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
-    const listEl = document.getElementById('savedList');
-    if (listEl) {
-      if (names.length > 0) {
-        listEl.innerHTML = `
-          <h3>💾 Мои игры (${names.length}):</h3>
-          <div style="display:grid;gap:8px;margin-top:12px;">
-            ${names.map(name => 
-              `<button class="secondary" onclick="loadGame('${name}')">${name}</button>`
-            ).join('')}
-          </div>
-        `;
-        document.getElementById('savedGamesBtn').style.display = 'none';
-      } else {
-        listEl.innerHTML = '';
-        document.getElementById('savedGamesBtn').style.display = 'block';
+    document.getElementById('doneFantsBtn')?.addEventListener('click', () => {
+      if (gameState.fants.length === 0) {
+        alert('❗ Нужно хотя бы 1 фант');
+        return;
       }
-    }
-  };
+      saveState();
+      const url = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
+      window.location.href = url;
+    });
 
-  window.loadGame = (name) => {
-    if (loadState(name)) {
-      showScreen('fants');
-      updateUI();
-    } else {
-      alert('❌ Не удалось загрузить: ' + name);
-    }
-  };
+    const updateSavedList = () => {
+      const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
+      const listEl = document.getElementById('savedList');
+      if (listEl) {
+        if (names.length > 0) {
+          listEl.innerHTML = `
+            <h3>💾 Мои игры (${names.length}):</h3>
+            <div style="display:grid;gap:8px;margin-top:12px;">
+              ${names.map(name => 
+                `<button class="secondary" onclick="loadGame('${name}')">${name}</button>`
+              ).join('')}
+            </div>
+          `;
+          document.getElementById('savedGamesBtn').style.display = 'none';
+        } else {
+          listEl.innerHTML = '';
+          document.getElementById('savedGamesBtn').style.display = 'block';
+        }
+      }
+    };
 
-  // 🔄 Инициализация
-  loadFantLists().then(() => {
+    window.loadGame = (name) => {
+      if (loadState(name)) {
+        showScreen('fants');
+        updateUI();
+      } else {
+        alert('❌ Не удалось загрузить: ' + name);
+      }
+    };
+
     updateUI();
   });
+}
 
-  // Для отладки: нажмите F12 → Console → введите showState()
-  window.showState = () => console.log("State:", state);
-});
+// 🗳️ ГОЛОСОВАНИЕ
+if (currentPage === 'voting.html') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionName = urlParams.get('session');
+    const playerNamesStr = urlParams.get('playerNames');
+
+    if (!sessionName || !playerNamesStr) {
+      alert('❌ Ошибка: нет данных сессии');
+      window.location.href = 'index.html';
+      return;
+    }
+
+    loadState(sessionName);
+    gameState.playerNames = playerNamesStr.split(';');
+    gameState.sessionName = sessionName;
+
+    if (Object.keys(gameState.votes).length === 0) {
+      gameState.votes = {};
+      gameState.fants.forEach(fant => {
+        gameState.votes[fant] = [0, 0, 0, 0];
+      });
+    }
+
+    let currentPlayer = 0;
+    let currentFantIndex = 0;
+
+    function showPlayerTurn() {
+      document.getElementById('turnPlayer').textContent = 
+        gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
+      showScreen('playerTurn');
+    }
+
+    function updateVotingUI() {
+      if (currentFantIndex >= gameState.fants.length) {
+        currentPlayer++;
+        if (currentPlayer < 4) {
+          currentFantIndex = 0;
+          showPlayerTurn();
+        } else {
+          finishVoting();
+        }
+        return;
+      }
+
+      const currentFant = gameState.fants[currentFantIndex];
+      const remaining = gameState.fants.length - currentFantIndex;
+
+      document.getElementById('votingPlayer').textContent = 
+        gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
+      document.getElementById('remainingCount').textContent = remaining;
+      document.getElementById('currentFant').textContent = currentFant;
+
+      showScreen('voting');
+    }
+
+    function vote(score) {
+      const currentFant = gameState.fants[currentFantIndex];
+      gameState.votes[currentFant][currentPlayer] = score;
+      currentFantIndex++;
+      saveState();
+      updateVotingUI();
+    }
+
+    function finishVoting() {
+      const scores = {};
+      const revealed = {};
+      const finalFants = [];
+
+      for (const fant of gameState.fants) {
+        const votes = gameState.votes[fant];
+        const rejected = votes.includes(-1);
+        if (!rejected) {
+          const total = votes.reduce((a, b) => a + (b > 0 ? b : 0), 0);
+          scores[fant] = total;
+          revealed[fant] = false;
+          finalFants.push(fant);
+        }
+      }
+
+      gameState.scores = scores;
+      gameState.revealed = revealed;
+      gameState.fants = finalFants;
+
+      saveState();
+
+      const params = new URLSearchParams();
+      params.set('session', sessionName);
+      params.set('scores', JSON.stringify(scores));
+      params.set('revealed', JSON.stringify(revealed));
+      params.set('fants', JSON.stringify(finalFants));
+
+      window.location.href = `results.html?${params.toString()}`;
+    }
+
+    document.getElementById('startTurnBtn')?.addEventListener('click', () => {
+      updateVotingUI();
+    });
+
+    document.getElementById('rejectBtn')?.addEventListener('click', () => vote(-1));
+    document.getElementById('easyBtn')?.addEventListener('click', () => vote(1));
+    document.getElementById('hotBtn')?.addEventListener('click', () => vote(2));
+    document.getElementById('fireBtn')?.addEventListener('click', () => vote(3));
+
+    setTimeout(showPlayerTurn, 100);
+  });
+}
+
+// 📊 РЕЗУЛЬТАТЫ
+if (currentPage === 'results.html') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionName = urlParams.get('session');
+    const scoresStr = urlParams.get('scores');
+    const revealedStr = urlParams.get('revealed');
+    const fantsStr = urlParams.get('fants');
+
+    if (!sessionName || !scoresStr || !revealedStr || !fantsStr) {
+      alert('❌ Ошибка: нет данных');
+      window.location.href = 'index.html';
+      return;
+    }
+
+    gameState.sessionName = sessionName;
+    gameState.scores = JSON.parse(scoresStr);
+    gameState.revealed = JSON.parse(revealedStr);
+    gameState.fants = JSON.parse(fantsStr);
+
+    function showCategory(tab, min, max) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+
+      const list = document.getElementById('fantListContainer');
+      const filtered = gameState.fants.filter(fant => {
+        const score = gameState.scores[fant] || 0;
+        return score >= min && score <= max;
+      }).sort(() => Math.random() - 0.5);
+
+      list.innerHTML = filtered.map(fant => 
+        `<div class="fant-item ${gameState.revealed[fant] ? 'revealed' : 'hidden'}" data-fant="${fant}">
+          ${gameState.revealed[fant] ? fant : '******'}
+        </div>`
+      ).join('');
+
+      list.querySelectorAll('.fant-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const fant = item.dataset.fant;
+          if (!gameState.revealed[fant]) {
+            alert(fant);
+            gameState.revealed[fant] = true;
+            saveState();
+            showCategory(tab, min, max);
+          }
+        });
+      });
+    }
+
+    document.querySelector('[data-tab="easy"]')?.addEventListener('click', () => showCategory('easy', 1, 6));
+    document.querySelector('[data-tab="hot"]')?.addEventListener('click', () => showCategory('hot', 7, 9));
+    document.querySelector('[data-tab="fire"]')?.addEventListener('click', () => showCategory('fire', 10, 999));
+
+    document.getElementById('saveResultsBtn')?.addEventListener('click', () => {
+      const name = gameState.sessionName || prompt('Название игры:');
+      if (!name) return;
+
+      const fantsRaw = gameState.fants.map(fant => 
+        `${fant}=${gameState.scores[fant]}:${gameState.revealed[fant] ? '1' : '0'}`
+      ).join(';');
+
+      try {
+        localStorage.setItem(`game_${name}`, JSON.stringify({
+          sessionName: name,
+          playerNames: gameState.playerNames,
+          fants_raw: fantsRaw
+        }));
+
+        const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
+        if (!names.includes(name)) {
+          names.push(name);
+          localStorage.setItem('saved_games', JSON.stringify(names));
+        }
+
+        alert(`✅ «${name}» сохранено`);
+      } catch (e) {
+        alert('❌ Ошибка сохранения');
+      }
+    });
+
+    setTimeout(() => showCategory('easy', 1, 6), 100);
+  });
+}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🗳️ Голосование</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #121212;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .screen {
+      display: none;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .active { display: block; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; text-align: center; }
+    h2 { font-size: 1.6rem; margin: 1.2rem 0; text-align: center; }
+    .fant-text {
+      background: #2d2d2d;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 20px 0;
+      font-size: 1.4rem;
+      white-space: pre-wrap;
+    }
+    .counter { 
+      background: #2a2a2a; 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      margin: 16px 0; 
+      display: inline-block; 
+    }
+    .votes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 24px 0;
+    }
+    button {
+      font-size: 1.1rem;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .reject { background: #ba1a1a; }
+    .easy { background: #4caf50; }
+    .hot { background: #ff9800; }
+    .fire { background: #f44336; }
+    .player { 
+      text-align: center; 
+      font-size: 1.4rem; 
+      margin: 16px 0;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="playerTurn" class="screen active">
+    <h1>🎮 Новый ход</h1>
+    <div class="player" id="turnPlayer">—</div>
+    <button id="startTurnBtn" style="width:100%; max-width:300px;">ОК</button>
+  </div>
+
+  <div id="voting" class="screen">
+    <div class="player" id="votingPlayer">—</div>
+    <div class="counter">Осталось фантов: <span id="remainingCount">0</span></div>
+    <div class="fant-text" id="currentFant">—</div>
+
+    <div class="votes">
+      <button class="reject" id="rejectBtn">❌ Отклонить</button>
+      <button class="easy" id="easyBtn">✅ Легко (+1)</button>
+      <button class="hot" id="hotBtn">🔥 Жарко (+2)</button>
+      <button class="fire" id="fireBtn">💥 Огонь (+3)</button>
+    </div>
+  </div>
+
+  <div id="results" class="screen">
+    <h1>🎉 Голосование завершено!</h1>
+    <p>Перенаправление к результатам...</p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📊 Результаты</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #121212;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .screen {
+      display: none;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .active { display: block; }
+    h1 { font-size: 2.2rem; margin-bottom: 1rem; text-align: center; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: #333;
+      color: #fff;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      background: #6750A4;
+    }
+    .fants-list {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 16px 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .fant-item {
+      background: #2d2d2d;
+      padding: 14px;
+      margin: 8px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+    .fant-item.revealed { color: #fff; }
+    .fant-item.hidden { color: #888; }
+    .save-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      background: #6750A4;
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="resultsScreen" class="screen active">
+    <h1>📊 Результаты голосования</h1>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="easy">✅ Лёгко</button>
+      <button class="tab-btn" data-tab="hot">🔥 Жарко</button>
+      <button class="tab-btn" data-tab="fire">💥 Огонь</button>
+    </div>
+
+    <div id="fantListContainer" class="fants-list"></div>
+
+    <button class="save-btn" id="saveResultsBtn">💾 Сохранить результаты</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
