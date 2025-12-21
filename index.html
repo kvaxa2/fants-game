@@ -7,13 +7,15 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #121212;
-      color: #fff;
-      min-height: 100vh;
-      padding: 20px;
-      /* ❗ Убираем прокрутку, но оставляем возможность при необходимости */
-      overflow-y: auto;
+     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* ✅ Градиент как в Android */
+    background: linear-gradient(45deg, #6750A4, #FF5252);
+    color: white;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    /* Текст остаётся читаемым */
+    -webkit-font-smoothing: antialiased;
     }
     /* ❗ Главное: .screen — это НЕ 100vh, а просто блоки */
     .screen {
