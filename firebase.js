@@ -12,7 +12,6 @@ const firebaseConfig = {
   messagingSenderId: "143359324758",
   appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
   measurementId: "G-TKHG5KNRZP"
-  databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
 
