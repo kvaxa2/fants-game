@@ -2,6 +2,51 @@
 // Работает с: index.html, voting.html, results.html
 
 const currentPage = window.location.pathname.split('/').pop();
+// Firebase
+let currentUser = null;
+let dbRef = null;
+
+// Динамический импорт (чтобы не ломать старую версию)
+if (typeof importScripts !== 'function') {
+  import('./firebase.js')
+    .then(firebase => {
+      const { auth, db, provider, signInWithPopup, onAuthStateChanged, ref, set, onValue } = firebase;
+
+      // Следим за авторизацией
+      onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (user) {
+          dbRef = ref(db, 'users/' + user.uid + '/games');
+          
+          // 🔁 Автосинхронизация
+          onValue(dbRef, (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              // Восстанавливаем сохранённые игры
+              localStorage.setItem('saved_games_cloud', JSON.stringify(data));
+              
+              // Если текущая сессия есть — загружаем
+              if (gameState.sessionName && data[gameState.sessionName]) {
+                Object.assign(gameState, data[gameState.sessionName]);
+              }
+            }
+          });
+        }
+      });
+
+      // Кнопка входа
+      document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
+        signInWithPopup(auth, provider)
+          .catch(error => {
+            console.error("Ошибка входа:", error);
+            alert('❌ Не удалось войти через Google');
+          });
+      });
+    })
+    .catch(err => {
+      console.warn("Firebase не подключён:", err);
+    });
+}
 
 let gameState = {
   code: '',
@@ -62,6 +107,22 @@ function saveState() {
       }
     } catch (e) {}
   }
+  // После локального сохранения → в облако
+if (currentUser && dbRef && gameState.sessionName) {
+  import('./firebase.js')
+    .then(firebase => {
+      const { set } = firebase;
+      const gameRef = firebase.ref(db, 'users/' + currentUser.uid + '/games/' + gameState.sessionName);
+      set(gameRef, {
+        sessionName: gameState.sessionName,
+        playerNames: gameState.playerNames,
+        fants: gameState.fants,
+        scores: gameState.scores,
+        revealed: gameState.revealed,
+        votes: gameState.votes
+      });
+    });
+}
 }
 
 function loadState(sessionName) {
