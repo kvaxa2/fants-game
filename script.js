@@ -26,33 +26,6 @@ let gameState = {
 let currentUser = null;
 let dbRef = null;
 
-// Динамический импорт Firebase
-if (typeof importScripts !== 'function') {
-  import('./firebase.js')
-    .then(firebase => {
-      const { auth, db, provider, signInWithPopup, onAuthStateChanged, ref, set } = firebase;
-
-      // Следим за авторизацией
-      onAuthStateChanged(auth, (user) => {
-        currentUser = user;
-        if (user) {
-          dbRef = ref(db, 'users/' + user.uid + '/games');
-        }
-      });
-
-      // Кнопка входа
-      document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
-        signInWithPopup(auth, provider)
-          .catch(error => {
-            console.error("Ошибка входа:", error);
-            alert('❌ Не удалось войти через Google');
-          });
-      });
-    })
-    .catch(err => {
-      console.warn("Firebase не подключён:", err);
-    });
-}
 
 // ✅ 3. Функции — как раньше, но с облаком в saveState
 
@@ -99,11 +72,14 @@ function saveState() {
     } catch (e) {}
   }
 
-  // ✅ Облачное сохранение — используем уже загруженные функции
-  if (currentUser && dbRef && gameState.sessionName) {
-    try {
-      const gameRef = dbRef.child(gameState.sessionName);
-      gameRef.set({
+  // ✅ Облачное сохранение — используем глобальный firebase
+if (gameState.sessionName) {
+  try {
+    const user = firebase.auth().currentUser;
+    if (user) {
+      const db = firebase.database();
+      const ref = db.ref('users/' + user.uid + '/games/' + gameState.sessionName);
+      ref.set({
         sessionName: gameState.sessionName,
         playerNames: gameState.playerNames,
         fants: gameState.fants,
@@ -111,9 +87,9 @@ function saveState() {
         revealed: gameState.revealed,
         votes: gameState.votes
       });
-    } catch (e) {
-      console.warn("Облако: не удалось сохранить", e);
     }
+  } catch (e) {
+    console.warn("Облако: не удалось сохранить", e);
   }
 }
 
@@ -145,7 +121,26 @@ function showScreen(screenId) {
 if (currentPage === 'index.html' || currentPage === '') {
   document.addEventListener('DOMContentLoaded', async () => {
     await loadFantLists();
+// 🔐 БЛОКИРОВКА
+if (currentPage === 'index.html' || currentPage === '') {
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadFantLists();
 
+    // ✅ ВСТАВЬТЕ КОД СЮДА — сразу после loadFantLists()
+    document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider)
+        .catch(error => {
+          console.error("Ошибка входа:", error);
+          alert('❌ Не удалось войти через Google');
+        });
+    });
+
+    // ... остальной код (код с codeInput, unlockBtn и т.д.)
+    const codeInput = document.getElementById('codeInput');
+    // ...
+  });
+}
     const codeInput = document.getElementById('codeInput');
     const unlockBtn = document.getElementById('unlockBtn');
 

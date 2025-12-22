@@ -4,6 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎭 Фанты для пар</title>
+  <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+  // 🔑 Конфигурация Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
+    authDomain: "fants-game.firebaseapp.com",
+    databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "fants-game",
+	storageBucket: "fants-game.firebasestorage.app",
+	messagingSenderId: "143359324758",
+	appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
+	measurementId: "G-TKHG5KNRZP"
+  };
+
+  // Инициализация
+  firebase.initializeApp(firebaseConfig);
+</script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -67,7 +88,14 @@
     <h1>🔐 Доступ закрыт</h1>
     <input type="text" id="codeInput" placeholder="Введите код" autocomplete="off" />
     <button id="unlockBtn" disabled>Разблокировать</button>
-	
+	<button id="googleLoginBtn" style="
+  margin-top: 16px; padding: 12px 24px; background: white;
+  color: #4285f4; border: 1px solid #4285f4; border-radius: 8px;
+  display: flex; align-items: center; gap: 8px;
+">
+  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+  Войти через Google
+</button>
 	<button id="googleLoginBtn" style="
   background: white; color: #4285f4; border: 1px solid #4285f4;
   padding: 12px 24px; border-radius: 8px; font-weight: 500;
