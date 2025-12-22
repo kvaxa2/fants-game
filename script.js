@@ -1,3 +1,5 @@
+console.log("версия 1");
+
 // ✅ Единый script.js — Firebase popup auth + вся существующая логика
 
 const currentPage = window.location.pathname.split('/').pop();
@@ -28,12 +30,40 @@ let firebaseUser = null;
 if (typeof firebase !== 'undefined' && firebase.auth) {
   firebase.auth().onAuthStateChanged(user => {
     firebaseUser = user || null;
+
     if (user) {
       console.log("☁️ Firebase: пользователь вошёл", user.email);
+      loadGamesFromCloud(user.uid);
     } else {
       console.log("🚫 Firebase: пользователь не авторизован");
     }
   });
+}
+
+// --------------------
+// ☁️ CLOUD → LOCAL (SYNC)
+// --------------------
+function loadGamesFromCloud(uid) {
+  firebase.database()
+    .ref(`users/${uid}/games`)
+    .once('value')
+    .then(snapshot => {
+      if (!snapshot.exists()) return;
+
+      const games = snapshot.val();
+      const savedNames = [];
+
+      Object.keys(games).forEach(name => {
+        localStorage.setItem(`game_${name}`, JSON.stringify(games[name]));
+        savedNames.push(name);
+      });
+
+      localStorage.setItem('saved_games', JSON.stringify(savedNames));
+      console.log("⬇️ Игры загружены из Firebase");
+    })
+    .catch(err => {
+      console.warn("Firebase load error", err);
+    });
 }
 
 // --------------------
@@ -59,54 +89,48 @@ async function loadFantLists() {
 }
 
 // --------------------
-// 💾 СОХРАНЕНИЕ (local + cloud)
+// 💾 СОХРАНЕНИЕ (LOCAL = CACHE, CLOUD = SOURCE)
 // --------------------
 function saveState() {
-  if (gameState.sessionName) {
-    try {
-      const data = {
-        sessionName: gameState.sessionName,
-        playerNames: gameState.playerNames,
-        fants: gameState.fants,
-        availableEasy: gameState.availableEasy,
-        availableHot: gameState.availableHot,
-        availableFire: gameState.availableFire,
-        votes: gameState.votes,
-        scores: gameState.scores,
-        revealed: gameState.revealed
-      };
+  if (!gameState.sessionName) return;
 
-      localStorage.setItem(`game_${gameState.sessionName}`, JSON.stringify(data));
+  const data = {
+    sessionName: gameState.sessionName,
+    playerNames: gameState.playerNames,
+    fants: gameState.fants,
+    availableEasy: gameState.availableEasy,
+    availableHot: gameState.availableHot,
+    availableFire: gameState.availableFire,
+    votes: gameState.votes,
+    scores: gameState.scores,
+    revealed: gameState.revealed
+  };
 
-      const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
-      if (!names.includes(gameState.sessionName)) {
-        names.push(gameState.sessionName);
-        localStorage.setItem('saved_games', JSON.stringify(names));
-      }
-    } catch {}
+  // 💾 local cache
+  localStorage.setItem(`game_${gameState.sessionName}`, JSON.stringify(data));
+
+  const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
+  if (!names.includes(gameState.sessionName)) {
+    names.push(gameState.sessionName);
+    localStorage.setItem('saved_games', JSON.stringify(names));
   }
 
-  // ☁️ Firebase
-  if (firebaseUser && firebase.database && gameState.sessionName) {
-    try {
-      firebase.database()
-        .ref(`users/${firebaseUser.uid}/games/${gameState.sessionName}`)
-        .set({
-          sessionName: gameState.sessionName,
-          playerNames: gameState.playerNames,
-          fants: gameState.fants,
-          scores: gameState.scores,
-          revealed: gameState.revealed,
-          votes: gameState.votes
-        });
-    } catch (e) {
-      console.warn("Firebase save error", e);
-    }
+  // ☁️ cloud
+  if (firebaseUser && firebase.database) {
+    firebase.database()
+      .ref(`users/${firebaseUser.uid}/games/${gameState.sessionName}`)
+      .set(data)
+      .then(() => {
+        console.log("☁️ Сохранено в Firebase:", gameState.sessionName);
+      })
+      .catch(e => {
+        console.warn("Firebase save error", e);
+      });
   }
 }
 
 // --------------------
-// 📂 ЗАГРУЗКА
+// 📂 ЗАГРУЗКА (LOCAL CACHE)
 // --------------------
 function loadState(sessionName) {
   try {
@@ -217,7 +241,8 @@ if (currentPage === '' || currentPage === 'index.html') {
     document.getElementById('doneFantsBtn')?.addEventListener('click', () => {
       if (!gameState.fants.length) return alert('❗ Нет фантов');
       saveState();
-      location.href = `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
+      location.href =
+        `voting.html?session=${encodeURIComponent(gameState.sessionName)}&playerNames=${encodeURIComponent(gameState.playerNames.join(';'))}`;
     });
 
     function updateSavedList() {
