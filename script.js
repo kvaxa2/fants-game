@@ -114,13 +114,13 @@ if (currentPage === 'index.html' || currentPage === '') {
     await loadFantLists();
 
     document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      firebase.auth().signInWithPopup(provider)
-        .catch(error => {
-          console.error("Ошибка входа:", error);
-          alert('❌ Не удалось войти через Google');
-        });
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithRedirect(provider)
+    .catch(error => {
+      console.error("Ошибка входа:", error);
+      alert('❌ Не удалось войти через Google');
     });
+});
 
     const codeInput = document.getElementById('codeInput');
     const unlockBtn = document.getElementById('unlockBtn');
@@ -571,4 +571,18 @@ if (currentPage === 'results.html') {
 
     setTimeout(() => showCategory('easy', 1, 6), 100);
   });
+  // ✅ Обработка редиректа после входа
+if (currentPage === 'index.html' || currentPage === '') {
+  firebase.auth().getRedirectResult()
+    .then(result => {
+      if (result.user) {
+        console.log("✅ Вошли через редирект", result.user.email);
+        // Можно обновить UI или перезагрузить страницу
+        window.location.reload();
+      }
+    })
+    .catch(error => {
+      console.error("Ошибка редиректа:", error);
+    });
+}
 }
