@@ -213,6 +213,8 @@ if (currentPage === '' || currentPage === 'index.html') {
       gameState.playerNames = names;
       gameState.sessionName = session;
       gameState.fants = [];
+	  gameState.scores = {};
+      gameState.revealed = {};
       gameState.availableEasy = [...gameState.easyFants];
       gameState.availableHot = [...gameState.hotFants];
       gameState.availableFire = [...gameState.fireFants];
@@ -227,6 +229,7 @@ if (currentPage === '' || currentPage === 'index.html') {
         gameState.playerNames[0] || '—';
       document.getElementById('counter').textContent =
         gameState.fants.length;
+		        
     }
 
     document.getElementById('addFantBtn')?.addEventListener('click', () => {
@@ -254,11 +257,35 @@ if (currentPage === '' || currentPage === 'index.html') {
       ).join('');
     }
 
-    window.loadGame = name => {
-      if (loadState(name)) {
-        showScreen('fants');
-        updateUI();
-      }
-    };
+    window.loadGame = (name) => {
+  try {
+    if (!loadState(name)) {
+      throw new Error('Data not found in localStorage');
+    }
+
+    // ✅ ПРОВЕРКА: игра завершена?
+    const hasScores = gameState.scores && Object.keys(gameState.scores).length > 0;
+    const hasRevealed = gameState.revealed && Object.keys(gameState.revealed).length > 0;
+
+    if (hasScores && hasRevealed) {
+      // 🟢 Игра завершена → открываем результаты
+      console.log('✅ Игра завершена — открываем результаты');
+
+      const params = new URLSearchParams();
+      params.set('session', name);
+
+      // Не передаём scores/revealed через URL — они уже в localStorage/Firebase
+      window.location.href = `results.html?${params.toString()}`;
+    } else {
+      // 🟡 Игра не завершена → продолжаем редактирование
+      console.log('🟡 Игра не завершена — открываем редактор фантов');
+      showScreen('fants');
+      updateUI();
+    }
+  } catch (e) {
+    console.error('❌ loadGame error:', e);
+    alert('❌ Не удалось загрузить игру: ' + name);
+  }
+};
   });
 }

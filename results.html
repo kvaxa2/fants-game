@@ -8,14 +8,12 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    /* ✅ Градиент как в Android */
-    background: linear-gradient(45deg, #6750A4, #FF5252);
-    color: white;
-    min-height: 100vh;
-    margin: 0;
-    padding: 20px;
-    /* Текст остаётся читаемым */
-    -webkit-font-smoothing: antialiased;
+      background: linear-gradient(45deg, #6750A4, #FF5252);
+      color: white;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
     }
     .screen {
       display: none;
@@ -73,42 +71,238 @@
       font-size: 1.1rem;
       font-weight: bold;
     }
+    #loading {
+      text-align: center;
+      font-size: 1.2rem;
+      padding: 40px 0;
+    }
   </style>
 </head>
 <body>
-  <div id="resultsScreen" class="screen active">
+  <div id="loading" class="screen active">
+    <h1>⏳ Загрузка результатов...</h1>
+    <p>Пожалуйста, подождите</p>
+  </div>
+
+  <div id="resultsScreen" class="screen">
     <h1>📊 Результаты голосования</h1>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="easy">✅ Лёгко</button>
-      <button class="tab-btn" data-tab="hot">🔥 Жарко</button>
-      <button class="tab-btn" data-tab="fire">💥 Огонь</button>
+      <button class="tab-btn active" data-tab="easy">✅ Лёгко (1–6)</button>
+      <button class="tab-btn" data-tab="hot">🔥 Жарко (7–9)</button>
+      <button class="tab-btn" data-tab="fire">💥 Огонь (10+)</button>
     </div>
 
     <div id="fantListContainer" class="fants-list"></div>
 
-    <button class="save-btn" id="saveResultsBtn">💾 Сохранить результаты</button>
+    <button class="save-btn" id="saveResultsBtn">💾 Сохранить игру</button>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <!-- 🔑 Firebase Config & Init -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
+      authDomain: "fants-game.firebaseapp.com",
+      databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "fants-game",
+      storageBucket: "fants-game.firebasestorage.app",
+      messagingSenderId: "143359324758",
+      appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
+      measurementId: "G-TKHG5KNRZP"
+    };
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+  </script>
+
+  <!-- Основная логика -->
   <script src="script.js"></script>
-  <!-- Диалог раскрытия/удаления фанта -->
-<dialog id="fantActionDialog">
-  <h3 id="dialogTitle">❓ Фант</h3>
-  <p id="dialogFantText" style="font-size:1.2rem; margin:16px 0; word-break:break-word;"></p>
-  <div style="display:flex; gap:10px;">
-    <button id="dialogRevealBtn" style="flex:1; padding:12px; background:#4caf50; border:none; border-radius:8px; color:white; font-weight:bold;">ОК</button>
-    <button id="dialogDeleteBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Удалить</button>
-  </div>
-</dialog>
 
-<!-- Диалог подтверждения удаления -->
-<dialog id="confirmDeleteDialog">
-  <h3 style="color:#ff9800;">⚠️ Удалить фант?</h3>
-  <p id="confirmFantText" style="margin:16px 0;"></p>
-  <div style="display:flex; gap:10px;">
-    <button id="confirmNoBtn" style="flex:1; padding:12px; background:#333; border:none; border-radius:8px; color:white;">Нет</button>
-    <button id="confirmYesBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Да</button>
-  </div>
-</dialog>
+  <!-- Диалоги -->
+  <dialog id="fantActionDialog">
+    <h3 id="dialogTitle">❓ Фант</h3>
+    <p id="dialogFantText" style="font-size:1.2rem; margin:16px 0; word-break:break-word;"></p>
+    <div style="display:flex; gap:10px;">
+      <button id="dialogRevealBtn" style="flex:1; padding:12px; background:#4caf50; border:none; border-radius:8px; color:white; font-weight:bold;">ОК</button>
+      <button id="dialogDeleteBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Удалить</button>
+    </div>
+  </dialog>
+
+  <dialog id="confirmDeleteDialog">
+    <h3 style="color:#ff9800;">⚠️ Удалить фант?</h3>
+    <p id="confirmFantText" style="margin:16px 0;"></p>
+    <div style="display:flex; gap:10px;">
+      <button id="confirmNoBtn" style="flex:1; padding:12px; background:#333; border:none; border-radius:8px; color:white;">Нет</button>
+      <button id="confirmYesBtn" style="flex:1; padding:12px; background:#ba1a1a; border:none; border-radius:8px; color:white; font-weight:bold;">Да</button>
+    </div>
+  </dialog>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionName = urlParams.get('session');
+
+      if (!sessionName) {
+        alert('❌ Не указана игра');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      showScreen('loading');
+
+      const maxWait = 8000;
+      const start = Date.now();
+
+      function tryLoad() {
+        if (loadState(sessionName)) {
+          console.log('✅ Результаты загружены');
+          initResults();
+          return true;
+        }
+        if (typeof firebaseUser !== 'undefined' && (Date.now() - start) < maxWait) {
+          setTimeout(tryLoad, 400);
+          return true;
+        }
+        alert('❌ Не удалось загрузить результаты');
+        window.location.href = 'index.html';
+        return false;
+      }
+
+      tryLoad();
+    });
+
+    function initResults() {
+      // 🔹 Проверка gameState
+      if (!gameState || !gameState.sessionName) {
+        console.error("❌ gameState пустой или sessionName отсутствует");
+        alert('❌ Не удалось загрузить игру. Попробуйте перезагрузить.');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // 🔹 Приведение ключей scores/revealed к строкам (защита от Firebase-автоконверсии)
+      if (gameState.scores && typeof gameState.scores === 'object') {
+        const newScores = {};
+        for (let key in gameState.scores) {
+          newScores[String(key)] = gameState.scores[key];
+        }
+        gameState.scores = newScores;
+      } else {
+        gameState.scores = {};
+      }
+
+      if (gameState.revealed && typeof gameState.revealed === 'object') {
+        const newRevealed = {};
+        for (let key in gameState.revealed) {
+          newRevealed[String(key)] = gameState.revealed[key];
+        }
+        gameState.revealed = newRevealed;
+      } else {
+        gameState.revealed = {};
+      }
+
+      if (!Array.isArray(gameState.fants)) gameState.fants = [];
+      if (gameState.fants.length === 0) {
+        console.warn("⚠️ Список фантов пуст.");
+        document.getElementById('fantListContainer').innerHTML = '<p style="text-align:center;color:#888;">Нет принятых фантов</p>';
+        showScreen('resultsScreen');
+        return;
+      }
+
+      // 🔹 Функция отображения категории
+      function showCategory(tab, min, max) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+
+        const list = document.getElementById('fantListContainer');
+        const filtered = gameState.fants.filter(fant => {
+          const score = gameState.scores[String(fant)] || 0;
+          return score >= min && score <= max;
+        }).sort(() => Math.random() - 0.5);
+
+        if (filtered.length === 0) {
+          list.innerHTML = `<p style="text-align:center;color:#888;">Нет фантов в категории «${tab}»</p>`;
+        } else {
+          list.innerHTML = filtered.map(fant => 
+            `<div class="fant-item ${gameState.revealed[String(fant)] ? 'revealed' : 'hidden'}" data-fant="${String(fant)}">
+              ${gameState.revealed[String(fant)] ? String(fant) : '******'}
+            </div>`
+          ).join('');
+
+          list.querySelectorAll('.fant-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const fant = item.dataset.fant;
+              if (gameState.revealed[fant]) {
+                alert(fant);
+                return;
+              }
+
+              const dialog = document.getElementById('fantActionDialog');
+              document.getElementById('dialogFantText').textContent = fant;
+
+              document.getElementById('dialogRevealBtn').onclick = () => {
+                gameState.revealed[fant] = true;
+                saveState();
+                showCategory(tab, min, max);
+                dialog.close();
+              };
+
+              document.getElementById('dialogDeleteBtn').onclick = () => {
+                dialog.close();
+                const confirmDialog = document.getElementById('confirmDeleteDialog');
+                document.getElementById('confirmFantText').textContent = `«${fant}» будет удалён навсегда.`;
+
+                document.getElementById('confirmNoBtn').onclick = () => confirmDialog.close();
+                document.getElementById('confirmYesBtn').onclick = () => {
+                  gameState.fants = gameState.fants.filter(f => String(f) !== fant);
+                  delete gameState.scores[fant];
+                  delete gameState.revealed[fant];
+                  saveState();
+                  showCategory(tab, min, max);
+                  confirmDialog.close();
+                };
+                confirmDialog.showModal();
+              };
+
+              dialog.showModal();
+            });
+          });
+        }
+      }
+
+      // 🔹 Назначение обработчиков
+      document.querySelector('[data-tab="easy"]')?.addEventListener('click', () => showCategory('easy', 1, 6));
+      document.querySelector('[data-tab="hot"]')?.addEventListener('click', () => showCategory('hot', 7, 9));
+      document.querySelector('[data-tab="fire"]')?.addEventListener('click', () => showCategory('fire', 10, 999));
+
+      document.getElementById('saveResultsBtn')?.addEventListener('click', () => {
+        const name = prompt('Сохранить под именем:', gameState.sessionName) || gameState.sessionName;
+        if (!name) return;
+
+        gameState.sessionName = name;
+        saveState();
+
+        const names = JSON.parse(localStorage.getItem('saved_games') || '[]');
+        if (!names.includes(name)) {
+          names.push(name);
+          localStorage.setItem('saved_games', JSON.stringify(names));
+        }
+
+        alert(`✅ Игра «${name}» сохранена в облако`);
+      });
+
+      // 🔹 Показ первой вкладки
+      setTimeout(() => {
+        showScreen('resultsScreen');
+        showCategory('easy', 1, 6);
+      }, 200);
+    }
+  </script>
 </body>
 </html>
