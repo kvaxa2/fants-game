@@ -117,10 +117,7 @@ function showScreen(screenId) {
   }
 }
 
-// 🔐 БЛОКИРОВКА
-if (currentPage === 'index.html' || currentPage === '') {
-  document.addEventListener('DOMContentLoaded', async () => {
-    await loadFantLists();
+
 // 🔐 БЛОКИРОВКА
 if (currentPage === 'index.html' || currentPage === '') {
   document.addEventListener('DOMContentLoaded', async () => {
@@ -135,13 +132,7 @@ if (currentPage === 'index.html' || currentPage === '') {
           alert('❌ Не удалось войти через Google');
         });
     });
-
-    // ... остальной код (код с codeInput, unlockBtn и т.д.)
-    const codeInput = document.getElementById('codeInput');
-    // ...
-  });
-}
-    const codeInput = document.getElementById('codeInput');
+const codeInput = document.getElementById('codeInput');
     const unlockBtn = document.getElementById('unlockBtn');
 
     if (codeInput && unlockBtn) {
@@ -160,6 +151,10 @@ if (currentPage === 'index.html' || currentPage === '') {
         }
       });
     }
+    
+  });
+}
+    
 
     document.getElementById('newGameBtn')?.addEventListener('click', () => {
       showScreen('names');
