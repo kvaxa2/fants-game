@@ -178,6 +178,91 @@ if (currentPage === '' || currentPage === 'index.html') {
         });
     });
 
+    // =============== 🔐 ТРЕТИЙ ВАРИАНТ: СВОЙ АККАУНТ (LOGIN + PASSWORD) ===============
+    document.getElementById('customLoginBtn')?.addEventListener('click', () => {
+      document.getElementById('customLoginForm').style.display = 'flex';
+      document.getElementById('formTitle').textContent = '🔐 Вход';
+      document.getElementById('formSubmit').textContent = 'Войти';
+      document.getElementById('passInput2').style.display = 'none';
+      window.authMode = 'login';
+    });
+
+    document.getElementById('formCancel')?.addEventListener('click', () => {
+      document.getElementById('customLoginForm').style.display = 'none';
+    });
+
+    document.getElementById('formToggle')?.addEventListener('click', () => {
+      if (window.authMode === 'login') {
+        window.authMode = 'register';
+        document.getElementById('formTitle').textContent = '🆕 Регистрация';
+        document.getElementById('formSubmit').textContent = 'Зарегистрироваться';
+        document.getElementById('passInput2').style.display = 'block';
+      } else {
+        window.authMode = 'login';
+        document.getElementById('formTitle').textContent = '🔐 Вход';
+        document.getElementById('formSubmit').textContent = 'Войти';
+        document.getElementById('passInput2').style.display = 'none';
+      }
+    });
+
+    document.getElementById('formSubmit')?.addEventListener('click', async () => {
+      const login = document.getElementById('loginInput').value.trim();
+      const pass1 = document.getElementById('passInput1').value;
+      const pass2 = document.getElementById('passInput2').value;
+
+      if (!login || !/^[a-zA-Z0-9_-]{3,20}$/.test(login)) {
+        alert('❌ Логин: 3–20 символов (латиница, цифры, _-)');
+        return;
+      }
+      if (pass1.length < 6) {
+        alert('❌ Пароль: минимум 6 символов');
+        return;
+      }
+      if (window.authMode === 'register' && pass1 !== pass2) {
+        alert('❌ Пароли не совпадают');
+        return;
+      }
+
+      const email = `${login}@quick.fants`; // фиктивный email
+
+      try {
+        let userCredential;
+        if (window.authMode === 'register') {
+          userCredential = await firebase.auth().createUserWithEmailAndPassword(email, pass1);
+        } else {
+          userCredential = await firebase.auth().signInWithEmailAndPassword(email, pass1);
+        }
+
+        document.getElementById('customLoginForm').style.display = 'none';
+        document.getElementById('loginInput').value = '';
+        document.getElementById('passInput1').value = '';
+        document.getElementById('passInput2').value = '';
+        alert(`✅ ${window.authMode === 'register' ? 'Регистрация' : 'Вход'} успешен!\nДобро пожаловать, ${login}!`);
+
+      } catch (err) {
+        console.error('Auth error:', err);
+        let msg = '❌ ';
+        switch (err.code) {
+          case 'auth/email-already-in-use':
+            msg += 'Логин занят — попробуйте войти';
+            break;
+          case 'auth/user-not-found':
+            msg += 'Пользователь не найден — зарегистрируйтесь';
+            break;
+          case 'auth/wrong-password':
+            msg += 'Неверный пароль';
+            break;
+          case 'auth/invalid-email':
+            msg += 'Некорректный логин';
+            break;
+          default:
+            msg += err.message || 'Ошибка входа';
+        }
+        alert(msg);
+      }
+    });
+    // =============== КОНЕЦ ТРЕТЬЕГО ВАРИАНТА ===============
+
     const codeInput = document.getElementById('codeInput');
     const unlockBtn = document.getElementById('unlockBtn');
 
@@ -191,6 +276,30 @@ if (currentPage === '' || currentPage === 'index.html') {
         updateSavedList();
       }
     });
+    // 🔁 Переключение "Мои игры"
+let savedGamesExpanded = false;
+document.getElementById('savedGamesBtn')?.addEventListener('click', () => {
+  const container = document.getElementById('savedGamesContainer');
+  if (!container) return;
+
+  savedGamesExpanded = !savedGamesExpanded;
+
+  if (savedGamesExpanded) {
+    updateSavedList(); // обновляем перед показом
+    container.style.display = 'block';
+    // Плавное появление (опционально)
+    container.style.opacity = '0';
+    container.style.transition = 'opacity 0.2s';
+    requestAnimationFrame(() => {
+      container.style.opacity = '1';
+    });
+  } else {
+    container.style.opacity = '0';
+    setTimeout(() => {
+      container.style.display = 'none';
+    }, 200);
+  }
+});
 
     document.getElementById('newGameBtn')?.addEventListener('click', () => {
       showScreen('names');
@@ -213,7 +322,7 @@ if (currentPage === '' || currentPage === 'index.html') {
       gameState.playerNames = names;
       gameState.sessionName = session;
       gameState.fants = [];
-	  gameState.scores = {};
+      gameState.scores = {};
       gameState.revealed = {};
       gameState.availableEasy = [...gameState.easyFants];
       gameState.availableHot = [...gameState.hotFants];
@@ -229,7 +338,6 @@ if (currentPage === '' || currentPage === 'index.html') {
         gameState.playerNames[0] || '—';
       document.getElementById('counter').textContent =
         gameState.fants.length;
-		        
     }
 
     document.getElementById('addFantBtn')?.addEventListener('click', () => {
@@ -249,43 +357,47 @@ if (currentPage === '' || currentPage === 'index.html') {
     });
 
     function updateSavedList() {
-      const list = JSON.parse(localStorage.getItem('saved_games') || '[]');
-      const el = document.getElementById('savedList');
-      if (!el) return;
-      el.innerHTML = list.map(n =>
-        `<button class="secondary" onclick="loadGame('${n}')">${n}</button>`
-      ).join('');
-    }
+  const container = document.getElementById('savedGamesContainer');
+  const listEl = document.getElementById('savedList');
+  if (!listEl) return;
+
+  const list = JSON.parse(localStorage.getItem('saved_games') || '[]');
+  
+  if (list.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center;color:#888;">Нет сохранённых игр</p>';
+  } else {
+    listEl.innerHTML = list.map(n =>
+      `<button class="secondary" onclick="loadGame('${n}')">${n}</button>`
+    ).join('');
+  }
+
+  // ✅ Если список сейчас открыт — оставляем открытым, иначе — скрыт
+  // (не меняем состояние при обновлении — только при клике)
+}
 
     window.loadGame = (name) => {
-  try {
-    if (!loadState(name)) {
-      throw new Error('Data not found in localStorage');
-    }
+      try {
+        if (!loadState(name)) {
+          throw new Error('Data not found in localStorage');
+        }
 
-    // ✅ ПРОВЕРКА: игра завершена?
-    const hasScores = gameState.scores && Object.keys(gameState.scores).length > 0;
-    const hasRevealed = gameState.revealed && Object.keys(gameState.revealed).length > 0;
+        const hasScores = gameState.scores && Object.keys(gameState.scores).length > 0;
+        const hasRevealed = gameState.revealed && Object.keys(gameState.revealed).length > 0;
 
-    if (hasScores && hasRevealed) {
-      // 🟢 Игра завершена → открываем результаты
-      console.log('✅ Игра завершена — открываем результаты');
-
-      const params = new URLSearchParams();
-      params.set('session', name);
-
-      // Не передаём scores/revealed через URL — они уже в localStorage/Firebase
-      window.location.href = `results.html?${params.toString()}`;
-    } else {
-      // 🟡 Игра не завершена → продолжаем редактирование
-      console.log('🟡 Игра не завершена — открываем редактор фантов');
-      showScreen('fants');
-      updateUI();
-    }
-  } catch (e) {
-    console.error('❌ loadGame error:', e);
-    alert('❌ Не удалось загрузить игру: ' + name);
-  }
-};
+        if (hasScores && hasRevealed) {
+          console.log('✅ Игра завершена — открываем результаты');
+          const params = new URLSearchParams();
+          params.set('session', name);
+          window.location.href = `results.html?${params.toString()}`;
+        } else {
+          console.log('🟡 Игра не завершена — открываем редактор фантов');
+          showScreen('fants');
+          updateUI();
+        }
+      } catch (e) {
+        console.error('❌ loadGame error:', e);
+        alert('❌ Не удалось загрузить игру: ' + name);
+      }
+    };
   });
 }
