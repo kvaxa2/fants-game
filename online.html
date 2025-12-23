@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌐 Онлайн-комната — Фанты для пар</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    // 🔑 Конфигурация Firebase — копия из index.html
+    const firebaseConfig = {
+      apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
+      authDomain: "fants-game.firebaseapp.com",
+      databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "fants-game",
+      storageBucket: "fants-game.firebasestorage.app",
+      messagingSenderId: "143359324758",
+      appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
+      measurementId: "G-TKHG5KNRZP"
+    };
+
+    // Инициализация — если ещё не инициализировано
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+  </script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(45deg, #6750A4, #FF5252);
+      color: white;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .screen {
+      display: none;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .active { display: block; }
+    h1 { font-size: 2.2rem; margin-bottom: 1.5rem; text-align: center; }
+    h2 { font-size: 1.6rem; margin: 1.5rem 0 1rem; text-align: center; }
+    input, button {
+      font-size: 1.1rem;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid #444;
+      background: #1e1e1e;
+      color: #fff;
+      width: 100%;
+      margin: 8px 0;
+    }
+    button {
+      background: #6750A4;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary { background: #333; }
+    button.danger { background: #ba1a1a; }
+    button[disabled] { opacity: 0.5; }
+    .players-list {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    .player-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #333;
+    }
+    .player-item:last-child { border-bottom: none; }
+    .player-name { font-weight: bold; }
+    .player-ready { color: #8bc34a; }
+    .instructions {
+      font-size: 0.9rem;
+      color: #bbb;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .room-code {
+      font-size: 1.4rem;
+      font-weight: bold;
+      text-align: center;
+      margin: 12px 0;
+      letter-spacing: 4px;
+      color: #fff;
+      background: rgba(0,0,0,0.2);
+      padding: 8px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 📱 Экран входа -->
+  <div id="roomScreen" class="screen active">
+    <h1>🌐 Онлайн-комната</h1>
+    <input type="text" id="roomCode" placeholder="Код комнаты (AAAAAA)" maxlength="6" 
+           style="text-transform: uppercase; letter-spacing: 2px;" autocomplete="off" />
+    <div style="display: flex; gap: 8px;">
+      <button id="joinRoomBtn">Подключиться</button>
+      <button id="createRoomBtn" class="secondary">🆕 Создать</button>
+    </div>
+    <p class="instructions">
+      • Создатель комнаты получает код и делится им.<br>
+      • Все 4 игрока заходят, вводят имя и ждут старта.<br>
+      • Аккаунт не обязателен — можно играть как гость.
+    </p>
+    <button id="backToMainBtn" class="secondary" style="margin-top: 20px;">← Назад в меню</button>
+  </div>
+
+  <!-- 📋 Лобби -->
+  <div id="lobbyScreen" class="screen">
+    <h1>👥 Игроки в комнате</h1>
+    <div class="room-code" id="lobbyRoomCode">—</div>
+    <div class="players-list" id="playersList">
+      <!-- Динамически заполняется -->
+    </div>
+    <p id="readyStatus" style="text-align:center; color:#888;">Ожидаются игроки...</p>
+    <button id="startGameBtn" disabled>▶️ Начать игру</button>
+    <button id="leaveRoomBtn" class="secondary" style="margin-top: 12px;">🚪 Покинуть</button>
+  </div>
+
+  <!-- ⏳ Загрузка -->
+  <div id="loadingScreen" class="screen">
+    <h1>⏳ Подключение...</h1>
+    <p>Пожалуйста, подождите</p>
+  </div>
+
+  <!-- Диалог: ввод имени -->
+  <div id="nameDialog" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
+    <div style="background:#1e1e1e; padding:24px; border-radius:16px; max-width:400px; width:90%;">
+      <h3>👤 Представьтесь</h3>
+      <input type="text" id="playerNameInput" placeholder="Ваше имя" maxlength="16" style="margin:8px 0;" />
+      <div style="margin-top:16px; display:flex; gap:8px;">
+        <button id="nameSubmitBtn" style="flex:1; background:#6750A4;">Войти</button>
+        <button id="nameCancelBtn" class="secondary" style="flex:1;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================
+    // 🔧 ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    // ==========================
+    let roomId = null;
+    let playerId = null; // uid или guest_XXXX
+    let playerName = null;
+    let roomRef = null;
+    let playersRef = null;
+
+    // ==========================
+    // 🧭 ПОМОЩНИКИ
+    // ==========================
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+      });
+      const s = document.getElementById(id);
+      if (s) {
+        s.style.display = 'block';
+        setTimeout(() => s.classList.add('active'), 10);
+      }
+    }
+
+    function generateRoomCode() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase().padEnd(6, 'X').slice(0, 6);
+    }
+
+    function getPlayerId() {
+      const user = firebase.auth().currentUser;
+      return user ? user.uid : `guest_${Date.now().toString().slice(-4)}`;
+    }
+
+    // ==========================
+    // 🎯 ИНИЦИАЛИЗАЦИЯ
+    // ==========================
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('room');
+      if (code) {
+        document.getElementById('roomCode').value = code.toUpperCase();
+        joinRoom(code.toUpperCase());
+      }
+
+      // Обработчики кнопок
+      document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+      document.getElementById('joinRoomBtn').addEventListener('click', () => {
+        const code = document.getElementById('roomCode').value.trim().toUpperCase();
+        if (!code || code.length !== 6) {
+          alert('❌ Код должен быть из 6 символов');
+          return;
+        }
+        joinRoom(code);
+      });
+
+      document.getElementById('backToMainBtn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      // Диалог ввода имени
+      document.getElementById('nameSubmitBtn').addEventListener('click', submitName);
+      document.getElementById('nameCancelBtn').addEventListener('click', () => {
+        document.getElementById('nameDialog').style.display = 'none';
+        showScreen('roomScreen');
+      });
+      document.getElementById('playerNameInput').addEventListener('keypress', e => {
+        if (e.key === 'Enter') submitName();
+      });
+
+      // Лобби: кнопки
+      document.getElementById('leaveRoomBtn').addEventListener('click', leaveRoom);
+      document.getElementById('startGameBtn').addEventListener('click', startGame);
+    });
+
+    // ==========================
+    // 🚀 СОЗДАТЬ КОМНАТУ
+    // ==========================
+    function createRoom() {
+      roomId = generateRoomCode();
+      playerId = getPlayerId();
+      showScreen('loadingScreen');
+
+      roomRef = firebase.database().ref(`rooms/${roomId}`);
+      playersRef = roomRef.child('players');
+
+      // Проверим, не занята ли случайно
+      roomRef.once('value', snap => {
+        if (snap.exists()) {
+          // Очень маловероятно, но пересоздадим
+          createRoom();
+          return;
+        }
+
+        // Создаём комнату
+        const now = Date.now();
+        roomRef.set({
+          createdAt: now,
+          createdBy: playerId,
+          status: 'lobby',
+          players: {}
+        }).then(() => {
+          enterRoomAsCreator();
+        }).catch(err => {
+          alert('❌ Не удалось создать комнату: ' + err.message);
+          showScreen('roomScreen');
+        });
+      });
+    }
+
+    function enterRoomAsCreator() {
+      document.getElementById('lobbyRoomCode').textContent = roomId;
+      showScreen('nameDialog');
+      document.getElementById('playerNameInput').value = 'Хозяин';
+      document.getElementById('playerNameInput').focus();
+    }
+
+    // ==========================
+    // 🔗 ПОДКЛЮЧИТЬСЯ К КОМНАТЕ
+    // ==========================
+    function joinRoom(code) {
+      roomId = code.toUpperCase();
+      playerId = getPlayerId();
+      showScreen('loadingScreen');
+
+      roomRef = firebase.database().ref(`rooms/${roomId}`);
+      playersRef = roomRef.child('players');
+
+      roomRef.once('value', snap => {
+        if (!snap.exists()) {
+          alert('❌ Комната не найдена. Убедитесь в правильности кода.');
+          showScreen('roomScreen');
+          return;
+        }
+
+        const roomData = snap.val();
+        if (roomData.status !== 'lobby') {
+          alert('⚠️ Игра уже идёт. Дождитесь новой комнаты.');
+          showScreen('roomScreen');
+          return;
+        }
+
+        document.getElementById('lobbyRoomCode').textContent = roomId;
+        showScreen('nameDialog');
+        document.getElementById('playerNameInput').focus();
+      }).catch(err => {
+        console.error(err);
+        alert('❌ Ошибка подключения: ' + (err.message || 'неизвестно'));
+        showScreen('roomScreen');
+      });
+    }
+
+    // ==========================
+    // ✅ ВВОД ИМЕНИ → ВХОД В ЛОББИ
+    // ==========================
+    function submitName() {
+      const name = document.getElementById('playerNameInput').value.trim();
+      if (!name || name.length < 2) {
+        alert('❌ Введите имя (минимум 2 символа)');
+        return;
+      }
+
+      playerName = name;
+      document.getElementById('nameDialog').style.display = 'none';
+
+      // Добавляем игрока в комнату
+      playersRef.child(playerId).set({
+        name: name,
+        joinedAt: Date.now(),
+        ready: false
+      }).then(() => {
+        // Подписываемся на обновления игроков
+        attachPlayersListener();
+        showScreen('lobbyScreen');
+      }).catch(err => {
+        console.error(err);
+        alert('❌ Не удалось войти в комнату');
+        showScreen('roomScreen');
+      });
+    }
+
+    // ==========================
+    // 👂 СЛУШАТЕЛЬ СПИСКА ИГРОКОВ
+    // ==========================
+    function attachPlayersListener() {
+      playersRef.on('value', snap => {
+        const players = snap.val() || {};
+        renderPlayers(players);
+        updateStartButton(players);
+      });
+    }
+
+    function renderPlayers(players) {
+      const listEl = document.getElementById('playersList');
+      const playersArray = Object.entries(players).map(([id, p]) => ({ id, ...p }));
+      playersArray.sort((a, b) => a.joinedAt - b.joinedAt);
+
+      if (playersArray.length === 0) {
+        listEl.innerHTML = '<p style="text-align:center;color:#888;">Пусто</p>';
+        return;
+      }
+
+      listEl.innerHTML = playersArray.map(p => `
+        <div class="player-item">
+          <span class="player-name">${p.name}</span>
+          <span class="player-ready">${p.ready ? '✅' : '⏳'}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateStartButton(players) {
+      const count = Object.keys(players).length;
+      const readyCount = Object.values(players).filter(p => p.ready).length;
+      const startBtn = document.getElementById('startGameBtn');
+
+      if (count < 2) {
+        startBtn.disabled = true;
+        document.getElementById('readyStatus').textContent = `Ожидаются игроки (${count}/4)`;
+        return;
+      }
+
+      // Только создатель может стартовать
+      const isCreator = players[playerId]?.name && playerId === firebase.database().ref(`rooms/${roomId}`).child('createdBy').toString();
+      // ↑ но проще: если ты первый вошёл — считай себя создателем
+      // В данном случае: старт разрешён, если ≥2 игрока и ты — один из них (упрощённо)
+      // Реализуем: старт — только если ≥2 и все готовы, ИЛИ ≥4 (автостарт)
+      // Пока — кнопка активна у всех, но реально стартует только если 4 игрока
+
+      const allReady = Object.values(players).every(p => p.ready);
+      const full = count >= 4;
+
+      if (full || (count >= 2 && allReady)) {
+        startBtn.disabled = false;
+        document.getElementById('readyStatus').textContent = full ? '✅ Готовы! Нажмите «Начать»' : '✅ Все готовы!';
+      } else {
+        startBtn.disabled = true;
+        document.getElementById('readyStatus').textContent = `${count}/4 игроков. Готово: ${readyCount}/${count}`;
+      }
+    }
+
+    // ==========================
+    // 🚪 ВЫХОД / УДАЛЕНИЕ
+    // ==========================
+    function leaveRoom() {
+      if (playersRef && playerId) {
+        playersRef.child(playerId).remove().catch(console.warn);
+      }
+      if (roomRef) {
+        roomRef.child('players').off('value'); // отписка
+      }
+      window.location.href = 'online.html';
+    }
+
+    // ==========================
+    // ▶️ СТАРТ ИГРЫ
+    // ==========================
+    function startGame() {
+      roomRef.once('value', snap => {
+        const room = snap.val();
+        if (!room || room.status !== 'lobby') return;
+
+        const players = room.players || {};
+        const playerNames = Object.values(players)
+          .sort((a, b) => a.joinedAt - b.joinedAt)
+          .map(p => p.name);
+
+        if (playerNames.length < 2) {
+          alert('❗ Нужно минимум 2 игрока');
+          return;
+        }
+
+        // Дополним до 4 имён (если нужно) — для совместимости с вашим кодом
+        while (playerNames.length < 4) {
+          playerNames.push(`Игрок ${playerNames.length + 1}`);
+        }
+
+        // Сохраняем начальное состояние в room.gameState
+        const sessionName = `Комната ${roomId}`;
+        const gameStateStub = {
+          sessionName: sessionName,
+          playerNames: playerNames.slice(0, 4),
+          fants: [],
+          votes: {},
+          scores: {},
+          revealed: {},
+          availableEasy: [],
+          availableHot: [],
+          availableFire: [],
+          currentPlayer: 0,
+          currentFantIndex: 0
+        };
+
+        roomRef.update({
+          status: 'names',
+          gameState: gameStateStub
+        }).then(() => {
+          // Редирект на онлайн-версию ввода имён
+          window.location.href = `online-names.html?room=${roomId}`;
+        }).catch(err => {
+          console.error(err);
+          alert('❌ Не удалось начать игру');
+        });
+      });
+    }
+  </script>
+</body>
+</html>

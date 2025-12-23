@@ -80,6 +80,7 @@
     <h1>🎮 Новый ход</h1>
     <div class="player" id="turnPlayer">—</div>
     <button id="startTurnBtn" style="width:100%; max-width:300px;">ОК</button>
+    <button id="backToMain" class="secondary" style="margin-top:12px; width:100%;">← В меню</button>
   </div>
 
   <div id="voting" class="screen">
@@ -93,6 +94,8 @@
       <button class="hot" id="hotBtn">🔥 Жарко (+2)</button>
       <button class="fire" id="fireBtn">💥 Огонь (+3)</button>
     </div>
+
+    <button id="backToMain2" class="secondary" style="margin-top:12px; width:100%;">← В меню</button>
   </div>
 
   <div id="resultsRedirect" class="screen">
@@ -105,7 +108,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-  <!-- 🔑 Firebase Config & Init -->
+  <!-- 🔑 Firebase Config -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
@@ -126,162 +129,221 @@
   <script src="script.js"></script>
 
   <script>
-    // ⚠️ ВАЖНО: НЕ ДУБЛИРУЙТЕ script.js! Он уже подключен выше.
+    let currentMode = 'solo'; // или 'online'
+    let currentRoomId = null;
+
+    // Переключение экранов (локально, т.к. script.js может быть не загружен)
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+      });
+      const s = document.getElementById(id);
+      if (s) {
+        s.style.display = 'block';
+        setTimeout(() => s.classList.add('active'), 10);
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+      showScreen('loading');
+
       const urlParams = new URLSearchParams(window.location.search);
       const sessionName = urlParams.get('session');
+      const roomId = urlParams.get('room');
 
-      if (!sessionName) {
+      if (!sessionName && !roomId) {
         alert('❌ Не указана игра');
         window.location.href = 'index.html';
         return;
       }
 
-      showScreen('loading');
+      // 🔍 Определяем режим
+      if (roomId) {
+        currentMode = 'online';
+        currentRoomId = roomId;
+        console.log('🌐 Режим: онлайн-комната', roomId);
+      } else {
+        currentMode = 'solo';
+        console.log('🧍 Режим: соло, сессия:', sessionName);
+      }
 
-      const maxWait = 8000;
+      // 🔁 Попытка загрузки
       const start = Date.now();
+      const maxWait = 8000;
 
       function tryLoad() {
-        if (loadState(sessionName)) {
-          console.log('✅ Игра загружена из localStorage');
-          initVoting();
-          return true;
+        let loaded = false;
+
+        // 🧍 Соло: из localStorage
+        if (currentMode === 'solo') {
+          loaded = loadState(sessionName);
+          if (loaded) {
+            console.log('✅ Игра загружена из localStorage');
+            initVoting();
+            return;
+          }
         }
 
-        if (typeof firebaseUser !== 'undefined' && (Date.now() - start) < maxWait) {
+        // 🌐 Онлайн: из Firebase
+        if (currentMode === 'online') {
+          loadGameStateFromRoom(roomId)
+            .then(ok => {
+              if (ok) {
+                console.log('✅ Игра загружена из комнаты');
+                initVoting();
+              } else {
+                if (Date.now() - start < maxWait) {
+                  setTimeout(tryLoad, 500);
+                } else {
+                  alert('❌ Не удалось загрузить игру. Проверьте подключение.');
+                  window.location.href = 'index.html';
+                }
+              }
+            })
+            .catch(err => {
+              console.error('Firebase room load error:', err);
+              if (Date.now() - start < maxWait) {
+                setTimeout(tryLoad, 500);
+              } else {
+                alert('❌ Ошибка подключения к комнате');
+                window.location.href = 'index.html';
+              }
+            });
+          return;
+        }
+
+        // Ждём Firebase-авторизацию (для соло-режима с облаком)
+        if (currentMode === 'solo' && typeof firebaseUser === 'undefined' && (Date.now() - start) < maxWait) {
           setTimeout(tryLoad, 400);
-          return true;
+          return;
         }
 
-        alert('❌ Не удалось загрузить игру. Проверьте вход в аккаунт.');
+        // Провал
+        alert('❌ Не удалось загрузить игру');
         window.location.href = 'index.html';
-        return false;
       }
 
       tryLoad();
+
+      // Кнопки "назад"
+      document.getElementById('backToMain')?.addEventListener('click', () => window.location.href = 'index.html');
+      document.getElementById('backToMain2')?.addEventListener('click', () => window.location.href = 'index.html');
     });
 
     function initVoting() {
-  // ✅ Проверка: есть ли игра?
-  if (!gameState || !gameState.sessionName) {
-    console.error("❌ gameState не загружен");
-    alert('❌ Не удалось загрузить игру.');
-    window.location.href = 'index.html';
-    return;
-  }
+      // 🔁 Проверка
+      if (!gameState || !gameState.sessionName || !gameState.playerNames?.length) {
+        alert('❌ Данные игры повреждены');
+        window.location.href = 'index.html';
+        return;
+      }
 
-  // ✅ Инициализация обязательных полей
-  if (!gameState.scores) gameState.scores = {};
-  if (!gameState.revealed) gameState.revealed = {};
+      // Инициализация
+      if (!gameState.scores) gameState.scores = {};
+      if (!gameState.revealed) gameState.revealed = {};
+      if (!gameState.votes || typeof gameState.votes !== 'object') gameState.votes = {};
 
-  // ✅ Проверка: есть ли фанты?
-  if (!gameState.fants || gameState.fants.length === 0) {
-    alert('❌ Нет фантов для голосования. Вернитесь и добавьте хотя бы один.');
-    window.location.href = 'index.html';
-    return;
-  }
+      // ✅ Перемешиваем фанты (как в Android)
+      for (let i = gameState.fants.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [gameState.fants[i], gameState.fants[j]] = [gameState.fants[j], gameState.fants[i]];
+      }
 
-  // 🔀 ПЕРЕМЕШИВАНИЕ ФАНТОВ — как в Android (Fisher-Yates shuffle)
-  for (let i = gameState.fants.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [gameState.fants[i], gameState.fants[j]] = [gameState.fants[j], gameState.fants[i]];
-  }
+      // Убеждаемся, что для каждого фанта есть массив голосов
+      for (const fant of gameState.fants) {
+        if (!gameState.votes[fant] || !Array.isArray(gameState.votes[fant])) {
+          gameState.votes[fant] = [0, 0, 0, 0]; // 4 игрока
+        }
+      }
 
-  // ✅ Инициализация голосов (если ещё нет)
-  if (!gameState.votes || typeof gameState.votes !== 'object') {
-    gameState.votes = {};
-  }
-  // Убедимся, что для каждого фанта есть массив голосов
-  for (const fant of gameState.fants) {
-    if (!gameState.votes[fant] || !Array.isArray(gameState.votes[fant])) {
-      gameState.votes[fant] = [0, 0, 0, 0]; // 4 игрока
-    }
-  }
+      let currentPlayer = gameState.currentPlayer || 0;
+      let currentFantIndex = gameState.currentFantIndex || 0;
 
-  let currentPlayer = gameState.currentPlayer || 0;
-  let currentFantIndex = gameState.currentFantIndex || 0;
+      function showPlayerTurn() {
+        document.getElementById('turnPlayer').textContent = 
+          gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
+        showScreen('playerTurn');
+      }
 
-  function showPlayerTurn() {
-    document.getElementById('turnPlayer').textContent = 
-      gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
-    showScreen('playerTurn');
-  }
+      function updateVotingUI() {
+        if (currentFantIndex >= gameState.fants.length) {
+          currentPlayer++;
+          if (currentPlayer < 4) {
+            currentFantIndex = 0;
+            gameState.currentPlayer = currentPlayer;
+            gameState.currentFantIndex = currentFantIndex;
+            saveState();
+            showPlayerTurn();
+          } else {
+            finishVoting();
+          }
+          return;
+        }
 
-  function updateVotingUI() {
-    if (currentFantIndex >= gameState.fants.length) {
-      currentPlayer++;
-      if (currentPlayer < 4) {
-        currentFantIndex = 0;
-        gameState.currentPlayer = currentPlayer;
+        const currentFant = gameState.fants[currentFantIndex];
+        const remaining = gameState.fants.length - currentFantIndex;
+
+        document.getElementById('votingPlayer').textContent = 
+          gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
+        document.getElementById('remainingCount').textContent = remaining;
+        document.getElementById('currentFant').textContent = currentFant;
+
+        showScreen('voting');
+      }
+
+      function vote(score) {
+        const currentFant = gameState.fants[currentFantIndex];
+        gameState.votes[currentFant][currentPlayer] = score;
+        currentFantIndex++;
         gameState.currentFantIndex = currentFantIndex;
         saveState();
-        showPlayerTurn();
-      } else {
-        finishVoting();
+        updateVotingUI();
       }
-      return;
-    }
 
-    const currentFant = gameState.fants[currentFantIndex];
-    const remaining = gameState.fants.length - currentFantIndex;
+      function finishVoting() {
+        const scores = {};
+        const revealed = {};
+        const finalFants = [];
 
-    document.getElementById('votingPlayer').textContent = 
-      gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
-    document.getElementById('remainingCount').textContent = remaining;
-    document.getElementById('currentFant').textContent = currentFant;
+        for (const fant of gameState.fants) {
+          const votes = gameState.votes[fant];
+          const rejected = votes.includes(-1);
+          if (!rejected) {
+            const total = votes.reduce((a, b) => a + (b > 0 ? b : 0), 0);
+            scores[fant] = total;
+            revealed[fant] = false;
+            finalFants.push(fant);
+          }
+        }
 
-    showScreen('voting');
-  }
+        gameState.scores = scores;
+        gameState.revealed = revealed;
+        gameState.fants = finalFants;
+        gameState.status = 'completed';
 
-  function vote(score) {
-    const currentFant = gameState.fants[currentFantIndex];
-    gameState.votes[currentFant][currentPlayer] = score;
-    currentFantIndex++;
-    gameState.currentFantIndex = currentFantIndex;
-    saveState();
-    updateVotingUI();
-  }
+        saveState();
 
-  function finishVoting() {
-    const scores = {};
-    const revealed = {};
-    const finalFants = [];
-
-    for (const fant of gameState.fants) {
-      const votes = gameState.votes[fant];
-      const rejected = votes.includes(-1);
-      if (!rejected) {
-        const total = votes.reduce((a, b) => a + (b > 0 ? b : 0), 0);
-        scores[fant] = total;
-        revealed[fant] = false;
-        finalFants.push(fant);
+        showScreen('resultsRedirect');
+        setTimeout(() => {
+          if (currentMode === 'online') {
+            window.location.href = `results.html?room=${currentRoomId}`;
+          } else {
+            window.location.href = `results.html?session=${encodeURIComponent(gameState.sessionName)}`;
+          }
+        }, 1000);
       }
+
+      // 🔹 Назначение обработчиков
+      document.getElementById('startTurnBtn')?.addEventListener('click', updateVotingUI);
+      document.getElementById('rejectBtn')?.addEventListener('click', () => vote(-1));
+      document.getElementById('easyBtn')?.addEventListener('click', () => vote(1));
+      document.getElementById('hotBtn')?.addEventListener('click', () => vote(2));
+      document.getElementById('fireBtn')?.addEventListener('click', () => vote(3));
+
+      // ✅ Старт
+      showPlayerTurn();
     }
-
-    gameState.scores = scores;
-    gameState.revealed = revealed;
-    gameState.fants = finalFants;
-    gameState.status = 'completed';
-
-    saveState();
-
-    showScreen('resultsRedirect');
-    setTimeout(() => {
-      window.location.href = `results.html?session=${encodeURIComponent(gameState.sessionName)}`;
-    }, 1000);
-  }
-
-  // 🔹 Назначение обработчиков
-  document.getElementById('startTurnBtn')?.addEventListener('click', updateVotingUI);
-  document.getElementById('rejectBtn')?.addEventListener('click', () => vote(-1));
-  document.getElementById('easyBtn')?.addEventListener('click', () => vote(1));
-  document.getElementById('hotBtn')?.addEventListener('click', () => vote(2));
-  document.getElementById('fireBtn')?.addEventListener('click', () => vote(3));
-
-  // ✅ Старт
-  showPlayerTurn();
-}
   </script>
 </body>
 </html>
