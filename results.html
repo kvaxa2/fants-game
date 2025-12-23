@@ -76,9 +76,6 @@
       font-size: 1.2rem;
       padding: 40px 0;
     }
-    .secondary {
-      background: #333 !important;
-    }
   </style>
 </head>
 <body>
@@ -99,7 +96,6 @@
     <div id="fantListContainer" class="fants-list"></div>
 
     <button class="save-btn" id="saveResultsBtn">💾 Сохранить игру</button>
-    <button class="secondary" id="backToMain" style="margin-top:12px; width:100%;">← В меню</button>
   </div>
 
   <!-- Firebase SDK -->
@@ -107,7 +103,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-  <!-- 🔑 Firebase Config -->
+  <!-- 🔑 Firebase Config & Init -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
@@ -147,120 +143,88 @@
   </dialog>
 
   <script>
-    let currentMode = 'solo';
-    let currentRoomId = null;
-
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(el => {
-        el.classList.remove('active');
-        el.style.display = 'none';
-      });
-      const s = document.getElementById(id);
-      if (s) {
-        s.style.display = 'block';
-        setTimeout(() => s.classList.add('active'), 10);
-      }
-    }
-
     document.addEventListener('DOMContentLoaded', () => {
-      showScreen('loading');
-
       const urlParams = new URLSearchParams(window.location.search);
       const sessionName = urlParams.get('session');
-      const roomId = urlParams.get('room');
 
-      if (!sessionName && !roomId) {
+      if (!sessionName) {
         alert('❌ Не указана игра');
         window.location.href = 'index.html';
         return;
       }
 
-      currentMode = roomId ? 'online' : 'solo';
-      currentRoomId = roomId;
+      showScreen('loading');
 
-      const start = Date.now();
       const maxWait = 8000;
+      const start = Date.now();
 
       function tryLoad() {
-        let loaded = false;
-
-        if (currentMode === 'solo') {
-          loaded = loadState(sessionName);
-        } else if (currentMode === 'online') {
-          loadGameStateFromRoom(roomId)
-            .then(ok => {
-              if (ok) {
-                initResults();
-              } else if (Date.now() - start < maxWait) {
-                setTimeout(tryLoad, 400);
-              } else {
-                alert('❌ Не удалось загрузить результаты');
-                window.location.href = 'index.html';
-              }
-            })
-            .catch(err => {
-              console.error(err);
-              if (Date.now() - start < maxWait) {
-                setTimeout(tryLoad, 400);
-              } else {
-                alert('❌ Ошибка подключения');
-                window.location.href = 'index.html';
-              }
-            });
-          return;
-        }
-
-        if (loaded) {
+        if (loadState(sessionName)) {
+          console.log('✅ Результаты загружены');
           initResults();
-        } else if ((Date.now() - start) < maxWait) {
-          setTimeout(tryLoad, 400);
-        } else {
-          alert('❌ Не удалось загрузить игру');
-          window.location.href = 'index.html';
+          return true;
         }
+        if (typeof firebaseUser !== 'undefined' && (Date.now() - start) < maxWait) {
+          setTimeout(tryLoad, 400);
+          return true;
+        }
+        alert('❌ Не удалось загрузить результаты');
+        window.location.href = 'index.html';
+        return false;
       }
 
       tryLoad();
-
-      document.getElementById('backToMain')?.addEventListener('click', () => {
-        window.location.href = 'index.html';
-      });
     });
 
     function initResults() {
+      // 🔹 Проверка gameState
       if (!gameState || !gameState.sessionName) {
-        alert('❌ Данные не загружены');
+        console.error("❌ gameState пустой или sessionName отсутствует");
+        alert('❌ Не удалось загрузить игру. Попробуйте перезагрузить.');
         window.location.href = 'index.html';
         return;
       }
 
-      // 🔧 Защита от автоконверсии ключей Firebase
+      // 🔹 Приведение ключей scores/revealed к строкам (защита от Firebase-автоконверсии)
       if (gameState.scores && typeof gameState.scores === 'object') {
         const newScores = {};
-        for (let key in gameState.scores) newScores[String(key)] = gameState.scores[key];
+        for (let key in gameState.scores) {
+          newScores[String(key)] = gameState.scores[key];
+        }
         gameState.scores = newScores;
-      } else gameState.scores = {};
+      } else {
+        gameState.scores = {};
+      }
 
       if (gameState.revealed && typeof gameState.revealed === 'object') {
         const newRevealed = {};
-        for (let key in gameState.revealed) newRevealed[String(key)] = gameState.revealed[key];
+        for (let key in gameState.revealed) {
+          newRevealed[String(key)] = gameState.revealed[key];
+        }
         gameState.revealed = newRevealed;
-      } else gameState.revealed = {};
+      } else {
+        gameState.revealed = {};
+      }
 
       if (!Array.isArray(gameState.fants)) gameState.fants = [];
+      if (gameState.fants.length === 0) {
+        console.warn("⚠️ Список фантов пуст.");
+        document.getElementById('fantListContainer').innerHTML = '<p style="text-align:center;color:#888;">Нет принятых фантов</p>';
+        showScreen('resultsScreen');
+        return;
+      }
 
+      // 🔹 Функция отображения категории
       function showCategory(tab, min, max) {
         document.querySelectorAll('.tab-btn').forEach(btn => {
           btn.classList.toggle('active', btn.dataset.tab === tab);
         });
 
         const list = document.getElementById('fantListContainer');
-        const filtered = gameState.fants
-          .filter(fant => {
-            const score = gameState.scores[String(fant)] || 0;
-            return score >= min && score <= max;
-          })
-          .sort(() => Math.random() - 0.5);
+        const filtered = gameState.fants.filter(fant => {
+          const score = gameState.scores[String(fant)] || 0;
+          return score >= min && score <= max;
+        }).sort(() => Math.random() - 0.5);
 
         if (filtered.length === 0) {
           list.innerHTML = `<p style="text-align:center;color:#888;">Нет фантов в категории «${tab}»</p>`;
@@ -312,17 +276,12 @@
         }
       }
 
-      // 🔹 Обработчики
+      // 🔹 Назначение обработчиков
       document.querySelector('[data-tab="easy"]')?.addEventListener('click', () => showCategory('easy', 1, 6));
       document.querySelector('[data-tab="hot"]')?.addEventListener('click', () => showCategory('hot', 7, 9));
       document.querySelector('[data-tab="fire"]')?.addEventListener('click', () => showCategory('fire', 10, 999));
 
       document.getElementById('saveResultsBtn')?.addEventListener('click', () => {
-        if (currentMode === 'online') {
-          alert('✅ Игра уже сохраняется автоматически в облако');
-          return;
-        }
-
         const name = prompt('Сохранить под именем:', gameState.sessionName) || gameState.sessionName;
         if (!name) return;
 
@@ -335,10 +294,10 @@
           localStorage.setItem('saved_games', JSON.stringify(names));
         }
 
-        alert(`✅ Игра «${name}» сохранена`);
+        alert(`✅ Игра «${name}» сохранена в облако`);
       });
 
-      // Показ
+      // 🔹 Показ первой вкладки
       setTimeout(() => {
         showScreen('resultsScreen');
         showCategory('easy', 1, 6);

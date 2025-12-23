@@ -5,39 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎭 Фанты для пар</title>
   <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-  <script>
-    // 🔑 Конфигурация Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
-      authDomain: "fants-game.firebaseapp.com",
-      databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "fants-game",
-      storageBucket: "fants-game.firebasestorage.app",
-      messagingSenderId: "143359324758",
-      appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
-      measurementId: "G-TKHG5KNRZP"
-    };
-    // Инициализация — только если ещё не инициализировано
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-  </script>
+<script>
+  // 🔑 Конфигурация Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDOF1Vxk4FPoDd5imnm3TdjtsQDjC8qmdI",
+    authDomain: "fants-game.firebaseapp.com",
+    databaseURL: "https://fants-game-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "fants-game",
+	storageBucket: "fants-game.firebasestorage.app",
+	messagingSenderId: "143359324758",
+	appId: "1:143359324758:web:4c7b69c4d091ce712f41f7",
+	measurementId: "G-TKHG5KNRZP"
+  };
 
+  // Инициализация
+  firebase.initializeApp(firebaseConfig);
+</script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(45deg, #6750A4, #FF5252);
-      color: white;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-      -webkit-font-smoothing: antialiased;
+     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* ✅ Градиент как в Android */
+    background: linear-gradient(45deg, #6750A4, #FF5252);
+    color: white;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    /* Текст остаётся читаемым */
+    -webkit-font-smoothing: antialiased;
     }
+    /* ❗ Главное: .screen — это НЕ 100vh, а просто блоки */
     .screen {
       display: none;
       max-width: 500px;
@@ -70,7 +71,6 @@
     }
     button:disabled { opacity: 0.5; }
     button.secondary { background: #333; }
-    button.danger { background: #ba1a1a; }
     .counter { background: #2a2a2a; padding: 8px 16px; border-radius: 8px; margin: 16px 0; display: inline-block; }
     .hints { display: flex; gap: 8px; flex-wrap: wrap; }
     .hint-btn { flex: 1; min-width: 100px; }
@@ -83,68 +83,51 @@
   </style>
 </head>
 <body>
-
   <!-- Экран блокировки -->
   <div id="lock" class="screen active">
     <h1>🔐 Доступ закрыт</h1>
     <input type="text" id="codeInput" placeholder="Введите код" autocomplete="off" />
     <button id="unlockBtn" disabled>Разблокировать</button>
+	<button id="googleLoginBtn" style="
+  margin-top: 16px; padding: 12px 24px; background: white;
+  color: #4285f4; border: 1px solid #4285f4; border-radius: 8px;
+  display: flex; align-items: center; gap: 8px;
+">
+  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+  Войти через Google
+</button>
+<!-- После #googleLoginBtn -->
+<button id="customLoginBtn" style="
+  margin-top: 12px; padding: 12px 24px; background: #2196F3;
+  color: white; border: none; border-radius: 8px; cursor: pointer;
+">🔐 Войти / Регистрация</button>
 
-    <button id="googleLoginBtn" style="
-      margin-top: 16px; padding: 12px 24px; background: white;
-      color: #4285f4; border: 1px solid #4285f4; border-radius: 8px;
-      display: flex; align-items: center; gap: 8px;
-    ">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
-      Войти через Google
-    </button>
+<!-- Форма (изначально скрыта) -->
+<div id="customLoginForm" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
+  <div style="background:#1e1e1e; padding:24px; border-radius:16px; max-width:400px; width:90%;">
+    <h3 id="formTitle">🔐 Вход</h3>
+    <input type="text" id="loginInput" placeholder="Логин (латиница/цифры)" maxlength="20" style="margin:8px 0;" />
+    <input type="password" id="passInput1" placeholder="Пароль (мин. 6 символов)" style="margin:8px 0;" />
+    <input type="password" id="passInput2" placeholder="Повторите пароль" style="margin:8px 0; display:none;" />
 
-    <button id="customLoginBtn" style="
-      margin-top: 12px; padding: 12px 24px; background: #2196F3;
-      color: white; border: none; border-radius: 8px; cursor: pointer;
-    ">🔐 Войти / Регистрация</button>
-
-    <!-- Форма входа/регистрации -->
-    <div id="customLoginForm" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
-      <div style="background:#1e1e1e; padding:24px; border-radius:16px; max-width:400px; width:90%;">
-        <h3 id="formTitle">🔐 Вход</h3>
-        <input type="text" id="loginInput" placeholder="Логин (латиница/цифры)" maxlength="20" style="margin:8px 0;" />
-        <input type="password" id="passInput1" placeholder="Пароль (мин. 6 символов)" style="margin:8px 0;" />
-        <input type="password" id="passInput2" placeholder="Повторите пароль" style="margin:8px 0; display:none;" />
-
-        <div style="margin-top:16px; display:flex; gap:8px;">
-          <button id="formSubmit" style="flex:1; background:#2196F3;">Войти</button>
-          <button id="formToggle" class="secondary" style="flex:1;">Регистрация</button>
-        </div>
-
-        <button id="formCancel" class="secondary" style="margin-top:12px; width:100%;">Отмена</button>
-      </div>
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button id="formSubmit" style="flex:1; background:#2196F3;">Войти</button>
+      <button id="formToggle" class="secondary" style="flex:1;">Регистрация</button>
     </div>
+
+    <button id="formCancel" class="secondary" style="margin-top:12px; width:100%;">Отмена</button>
   </div>
-
-  <!-- 🌐 Экран онлайн-комнаты -->
-  <div id="onlineRoom" class="screen">
-    <h1>🌐 Онлайн-комната</h1>
-    <input type="text" id="roomCodeInput" placeholder="Код комнаты (6 символов)" maxlength="6"
-           style="text-transform: uppercase; letter-spacing: 2px;" autocomplete="off" />
-    <div style="display: flex; gap: 8px; margin: 12px 0;">
-      <button id="joinRoomBtn">Подключиться</button>
-      <button id="createRoomBtn" class="secondary">🆕 Создать</button>
-    </div>
-    <div id="roomStatus" style="text-align: center; margin: 12px 0; color: #888;"></div>
-    <button id="backToMainFromOnlineBtn" class="secondary">← Назад в меню</button>
+</div>
   </div>
 
   <!-- Главное меню -->
   <div id="main" class="screen">
     <h1>🎭 Фанты для пар</h1>
     <button id="newGameBtn">Новая игра</button>
-    <button id="onlineRoomBtn" class="secondary">🌐 Онлайн-комната</button>
     <button id="savedGamesBtn" class="secondary">📁 Мои игры</button>
-
-    <div id="savedGamesContainer" style="margin-top: 16px; display: none;">
-      <div id="savedList"></div>
-    </div>
+<div id="savedGamesContainer" style="margin-top: 16px; display: none;">
+  <div id="savedList"></div>
+</div>
   </div>
 
   <!-- Ввод имён -->
@@ -158,29 +141,42 @@
     </div>
     <input type="text" id="sessionName" placeholder="Название игры (например: Вечеринка)" />
     <button id="nextNamesBtn">Далее</button>
-    <button id="backToMainFromNamesBtn" class="secondary" style="margin-top: 8px;">← Назад в меню</button>
   </div>
 
   <!-- Ввод фантов -->
-  <div id="fants" class="screen">
-    <h2>✏️ Фанты от: <span id="currentPlayer">—</span></h2>
-    <div class="counter">Фантов: <span id="counter">0</span></div>
-    <textarea id="fantInput" placeholder="Введите свой фант..." rows="2"></textarea>
-    <button id="addFantBtn">Добавить</button>
+  <!-- В экран ввода фантов добавьте КНОПКУ НАЗАД -->
+<div id="fants" class="screen">
+  <h2>✏️ Фанты от: <span id="currentPlayer">—</span></h2>
+  <div class="counter">Фантов: <span id="counter">0</span></div>
+  <textarea id="fantInput" placeholder="Введите свой фант..." rows="2"></textarea>
+  <button id="addFantBtn">Добавить</button>
 
-    <div class="hints">
-      <button class="hint-btn secondary" data-cat="easy">Лёгкие</button>
-      <button class="hint-btn secondary" data-cat="hot">Жаркие</button>
-      <button class="hint-btn secondary" data-cat="fire">Огонь</button>
+  <!-- Подсказки — теперь с диалогами -->
+<div class="hints">
+  <button class="hint-btn secondary" data-cat="easy">Лёгкие</button>
+  <button class="hint-btn secondary" data-cat="hot">Жаркие</button>
+  <button class="hint-btn secondary" data-cat="fire">Огонь</button>
+</div>
+
+<!-- Диалог выбора фанта -->
+<div id="fantDialog" class="screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+  <div style="background: #1e1e1e; padding: 20px; border-radius: 12px; max-width: 400px; width: 90%;">
+    <h2 id="dialogTitle">Выберите фант</h2>
+    <div id="dialogList" style="max-height: 300px; overflow-y: auto; margin: 16px 0;"></div>
+    <div style="display: flex; gap: 8px; justify-content: space-between;">
+      <button id="dialogCancel" class="secondary">Отмена</button>
+      <button id="dialogAdd">Добавить</button>
     </div>
-
-    <div class="fant-list" id="fantList"></div>
-
-    <!-- КНОПКА НАЗАД -->
-    <button id="backToNamesBtn" class="secondary">← Назад в меню</button>
-
-    <button id="doneFantsBtn">Голосование →</button>
   </div>
+</div>
+
+  <div class="fant-list" id="fantList"></div>
+
+  <!-- ✅ КНОПКА НАЗАД — НОВАЯ -->
+  <button id="backToNamesBtn" class="secondary">← Назад в меню</button>
+
+  <button id="doneFantsBtn">Голосование →</button>
+</div>
 
   <!-- Заглушка голосования -->
   <div id="voting" class="screen">
@@ -189,7 +185,6 @@
     <button id="backToMain">← В меню</button>
   </div>
 
-  <!-- Подключение script.js -->
   <script src="script.js"></script>
 
 </body>
