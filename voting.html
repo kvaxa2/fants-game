@@ -182,6 +182,26 @@
     return;
   }
 
+  // После загрузки gameState, перед инициализацией голосования
+for (let i = 0; i < gameState.fants.length; i++) {
+  let fant = gameState.fants[i];
+  
+  // Генерируем уникальный суффикс: можно и без Date.now()
+  const suffix = Math.random().toString(36).slice(2, 8); // например: "a3f9xk"
+
+  if (typeof fant === 'string') {
+    gameState.fants[i] = {
+      id: `fant_${i}_${suffix}`,
+      text: fant
+    };
+  } else if (!fant.id) {
+    gameState.fants[i] = {
+      ...fant,
+      id: `fant_obj_${i}_${suffix}`
+    };
+  }
+}
+
   // 🔀 ПЕРЕМЕШИВАНИЕ ФАНТОВ — как в Android (Fisher-Yates shuffle)
   for (let i = gameState.fants.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -193,11 +213,16 @@
     gameState.votes = {};
   }
   // Убедимся, что для каждого фанта есть массив голосов
-  for (const fant of gameState.fants) {
-    if (!gameState.votes[fant] || !Array.isArray(gameState.votes[fant])) {
-      gameState.votes[fant] = [0, 0, 0, 0]; // 4 игрока
-    }
+  // Убедимся, что для каждого фанта есть массив голосов
+for (const fant of gameState.fants) {
+  if (
+    !gameState.votes[fant.id] ||
+    !Array.isArray(gameState.votes[fant.id])
+  ) {
+    gameState.votes[fant.id] = [0, 0, 0, 0]; // 4 игрока
   }
+}
+
 
   let currentPlayer = gameState.currentPlayer || 0;
   let currentFantIndex = gameState.currentFantIndex || 0;
@@ -229,14 +254,18 @@
     document.getElementById('votingPlayer').textContent = 
       gameState.playerNames[currentPlayer] || `Игрок ${currentPlayer + 1}`;
     document.getElementById('remainingCount').textContent = remaining;
-    document.getElementById('currentFant').textContent = currentFant;
+    document.getElementById('currentFant').textContent =
+  typeof currentFant === 'string'
+    ? currentFant
+    : currentFant.text;
+
 
     showScreen('voting');
   }
 
   function vote(score) {
     const currentFant = gameState.fants[currentFantIndex];
-    gameState.votes[currentFant][currentPlayer] = score;
+    gameState.votes[currentFant.id][currentPlayer] = score;
     currentFantIndex++;
     gameState.currentFantIndex = currentFantIndex;
     saveState();
@@ -249,15 +278,17 @@
     const finalFants = [];
 
     for (const fant of gameState.fants) {
-      const votes = gameState.votes[fant];
-      const rejected = votes.includes(-1);
-      if (!rejected) {
-        const total = votes.reduce((a, b) => a + (b > 0 ? b : 0), 0);
-        scores[fant] = total;
-        revealed[fant] = false;
-        finalFants.push(fant);
-      }
-    }
+  const votes = gameState.votes[fant.id];
+  const rejected = votes.includes(-1);
+
+  if (!rejected) {
+    const total = votes.reduce((a, b) => a + (b > 0 ? b : 0), 0);
+    scores[fant.id] = total;
+    revealed[fant.id] = false;
+    finalFants.push(fant);
+  }
+}
+
 
     gameState.scores = scores;
     gameState.revealed = revealed;

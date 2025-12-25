@@ -178,6 +178,79 @@ if (currentPage === '' || currentPage === 'index.html') {
         });
     });
 
+    // ================================
+// 🎯 ФАНТЫ ИЗ JSON — ДИАЛОГ
+// ================================
+function showFantDialog(category) {
+  const dialog = document.getElementById('fantDialog');
+  const title = document.getElementById('dialogTitle');
+  const list = document.getElementById('dialogList');
+
+  title.textContent = `Выберите фант`;
+
+  let source = [];
+  let availableKey = '';
+
+  switch (category) {
+    case 'easy':
+      source = gameState.availableEasy;
+      availableKey = 'availableEasy';
+      break;
+    case 'hot':
+      source = gameState.availableHot;
+      availableKey = 'availableHot';
+      break;
+    case 'fire':
+      source = gameState.availableFire;
+      availableKey = 'availableFire';
+      break;
+    default:
+      return;
+  }
+
+  if (!source.length) {
+    list.innerHTML = `<p style="opacity:.6">Фанты закончились</p>`;
+    dialog.style.display = 'flex';
+    return;
+  }
+
+  // Перемешиваем
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
+
+  list.innerHTML = shuffled.map(f =>
+    `<div class="fant-item" data-fant="${f}" style="cursor:pointer">${f}</div>`
+  ).join('');
+
+  list.querySelectorAll('.fant-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const selected = item.dataset.fant;
+
+      gameState.fants.push(selected);
+      gameState[availableKey] =
+        gameState[availableKey].filter(f => f !== selected);
+
+      saveState();
+      updateUI();
+
+      showFantDialog(category); // обновляем без закрытия
+    });
+  });
+
+  document.getElementById('dialogCancel').onclick = () => {
+    dialog.style.display = 'none';
+  };
+
+  dialog.style.display = 'flex';
+}
+
+document.querySelectorAll('.hint-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showFantDialog(btn.dataset.cat);
+  });
+});
+
+
+
     // =============== 🔐 ТРЕТИЙ ВАРИАНТ: СВОЙ АККАУНТ (LOGIN + PASSWORD) ===============
     document.getElementById('customLoginBtn')?.addEventListener('click', () => {
       document.getElementById('customLoginForm').style.display = 'flex';
@@ -276,30 +349,6 @@ if (currentPage === '' || currentPage === 'index.html') {
         updateSavedList();
       }
     });
-    // 🔁 Переключение "Мои игры"
-let savedGamesExpanded = false;
-document.getElementById('savedGamesBtn')?.addEventListener('click', () => {
-  const container = document.getElementById('savedGamesContainer');
-  if (!container) return;
-
-  savedGamesExpanded = !savedGamesExpanded;
-
-  if (savedGamesExpanded) {
-    updateSavedList(); // обновляем перед показом
-    container.style.display = 'block';
-    // Плавное появление (опционально)
-    container.style.opacity = '0';
-    container.style.transition = 'opacity 0.2s';
-    requestAnimationFrame(() => {
-      container.style.opacity = '1';
-    });
-  } else {
-    container.style.opacity = '0';
-    setTimeout(() => {
-      container.style.display = 'none';
-    }, 200);
-  }
-});
 
     document.getElementById('newGameBtn')?.addEventListener('click', () => {
       showScreen('names');
@@ -357,23 +406,13 @@ document.getElementById('savedGamesBtn')?.addEventListener('click', () => {
     });
 
     function updateSavedList() {
-  const container = document.getElementById('savedGamesContainer');
-  const listEl = document.getElementById('savedList');
-  if (!listEl) return;
-
-  const list = JSON.parse(localStorage.getItem('saved_games') || '[]');
-  
-  if (list.length === 0) {
-    listEl.innerHTML = '<p style="text-align:center;color:#888;">Нет сохранённых игр</p>';
-  } else {
-    listEl.innerHTML = list.map(n =>
-      `<button class="secondary" onclick="loadGame('${n}')">${n}</button>`
-    ).join('');
-  }
-
-  // ✅ Если список сейчас открыт — оставляем открытым, иначе — скрыт
-  // (не меняем состояние при обновлении — только при клике)
-}
+      const list = JSON.parse(localStorage.getItem('saved_games') || '[]');
+      const el = document.getElementById('savedList');
+      if (!el) return;
+      el.innerHTML = list.map(n =>
+        `<button class="secondary" onclick="loadGame('${n}')">${n}</button>`
+      ).join('');
+    }
 
     window.loadGame = (name) => {
       try {

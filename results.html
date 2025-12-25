@@ -207,6 +207,26 @@
       }
 
       if (!Array.isArray(gameState.fants)) gameState.fants = [];
+      // 🔹 Нормализация фантов (ВСЕ → {id, text})
+gameState.fants = gameState.fants.map((fant, index) => {
+  if (typeof fant === 'string') {
+    return {
+      id: `legacy_${index}`,
+      text: fant
+    };
+  }
+  if (fant && typeof fant === 'object') {
+    return {
+      id: String(fant.id ?? `legacy_${index}`),
+      text: String(fant.text ?? '')
+    };
+  }
+  return {
+    id: `legacy_${index}`,
+    text: ''
+  };
+});
+
       if (gameState.fants.length === 0) {
         console.warn("⚠️ Список фантов пуст.");
         document.getElementById('fantListContainer').innerHTML = '<p style="text-align:center;color:#888;">Нет принятых фантов</p>';
@@ -222,7 +242,7 @@
 
         const list = document.getElementById('fantListContainer');
         const filtered = gameState.fants.filter(fant => {
-          const score = gameState.scores[String(fant)] || 0;
+          const score = gameState.scores[fant.id] || 0;
           return score >= min && score <= max;
         }).sort(() => Math.random() - 0.5);
 
@@ -230,24 +250,25 @@
           list.innerHTML = `<p style="text-align:center;color:#888;">Нет фантов в категории «${tab}»</p>`;
         } else {
           list.innerHTML = filtered.map(fant => 
-            `<div class="fant-item ${gameState.revealed[String(fant)] ? 'revealed' : 'hidden'}" data-fant="${String(fant)}">
-              ${gameState.revealed[String(fant)] ? String(fant) : '******'}
-            </div>`
+            `<div class="fant-item ${gameState.revealed[fant.id] ? 'revealed' : 'hidden'}"
+     data-fant-id="${fant.id}">
+  ${gameState.revealed[fant.id] ? fant.text : '******'}
+</div>`
           ).join('');
 
           list.querySelectorAll('.fant-item').forEach(item => {
             item.addEventListener('click', () => {
-              const fant = item.dataset.fant;
-              if (gameState.revealed[fant]) {
-                alert(fant);
-                return;
-              }
+              const fantId = item.dataset.fantId;
+const fant = gameState.fants.find(f => f.id === fantId);
+
+if (!fant) return;
+
 
               const dialog = document.getElementById('fantActionDialog');
-              document.getElementById('dialogFantText').textContent = fant;
+              document.getElementById('dialogFantText').textContent = fant.text;
 
               document.getElementById('dialogRevealBtn').onclick = () => {
-                gameState.revealed[fant] = true;
+                gameState.revealed[fant.id] = true;
                 saveState();
                 showCategory(tab, min, max);
                 dialog.close();
@@ -260,9 +281,27 @@
 
                 document.getElementById('confirmNoBtn').onclick = () => confirmDialog.close();
                 document.getElementById('confirmYesBtn').onclick = () => {
-                  gameState.fants = gameState.fants.filter(f => String(f) !== fant);
-                  delete gameState.scores[fant];
-                  delete gameState.revealed[fant];
+                  gameState.fants = gameState.fants.filter(f => f.id !== fant.id);
+            gameState.fants.forEach(fant => {
+  // 1️⃣ если score уже есть по id
+  if (gameState.scores[fant.id] != null) {
+    fixedScores[fant.id] = gameState.scores[fant.id];
+    return;
+  }
+
+  // 2️⃣ если score был по тексту (старый формат)
+  if (gameState.scores[fant.text] != null) {
+    fixedScores[fant.id] = gameState.scores[fant.text];
+    return;
+  }
+
+  // 3️⃣ иначе — 0
+  fixedScores[fant.id] = 0;
+});
+
+gameState.scores = fixedScores;
+                  delete gameState.scores[fant.id];
+                  delete gameState.revealed[fant.id];
                   saveState();
                   showCategory(tab, min, max);
                   confirmDialog.close();
@@ -303,6 +342,9 @@
         showCategory('easy', 1, 6);
       }, 200);
     }
+    // 🔹 Перенос scores на новые id
+const fixedScores = {};
+
   </script>
 </body>
 </html>
